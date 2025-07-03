@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Player - Your Personal Spotify</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Header -->
+        <header class="navbar navbar-dark bg-dark shadow-sm">
+            <div class="container-fluid">
+                <span class="navbar-brand mb-0 h1">
+                    <i class="fas fa-music text-success me-2"></i>
+                    Music Player
+                </span>
+                <div class="d-flex align-items-center">
+                    <span class="text-light me-3">
+                        <i class="fas fa-headphones me-1"></i>
+                        Now Playing
+                    </span>
+                </div>
+            </div>
+        </header>
+
+        <div class="row g-0">
+            <!-- Sidebar with playlist -->
+            <div class="col-md-4 col-lg-3 bg-dark-subtle">
+                <div class="p-3">
+                    <h5 class="mb-3">
+                        <i class="fas fa-list-music me-2"></i>
+                        Your Playlist
+                    </h5>
+                    <div id="songList" class="song-list">
+                        <!-- Songs will be loaded here by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main content area -->
+            <div class="col-md-8 col-lg-9">
+                <div class="player-main">
+                    <!-- Current song display -->
+                    <div class="current-song-display text-center py-5">
+                        <div class="album-art">
+                            <i class="fas fa-music fa-8x text-muted" id="albumIcon"></i>
+                            <img id="albumCover" src="" alt="Album Cover" class="d-none rounded-circle shadow-lg">
+                        </div>
+                        <div class="song-info mt-4">
+                            <h2 id="currentTitle" class="mb-1">Select a song to play</h2>
+                            <h5 id="currentArtist" class="text-muted">Choose from your playlist</h5>
+                        </div>
+                    </div>
+
+                    <!-- Audio element -->
+                    <audio id="audioPlayer" preload="metadata">
+                        Your browser does not support the audio element.
+                    </audio>
+
+                    <!-- Player controls -->
+                    <div class="player-controls fixed-bottom bg-dark text-light p-3 shadow-lg">
+                        <div class="container-fluid">
+                            <div class="row align-items-center">
+                                <!-- Song info -->
+                                <div class="col-md-3">
+                                    <div class="d-flex align-items-center">
+                                        <div class="mini-album-art me-3">
+                                            <i class="fas fa-music fa-2x text-success" id="miniAlbumIcon"></i>
+                                        </div>
+                                        <div>
+                                            <div id="miniTitle" class="fw-bold">No song selected</div>
+                                            <div id="miniArtist" class="small text-muted">Artist</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Main controls -->
+                                <div class="col-md-6">
+                                    <div class="text-center">
+                                        <!-- Control buttons -->
+                                        <div class="control-buttons mb-2">
+                                            <button id="prevBtn" class="btn btn-link text-light me-3" disabled>
+                                                <i class="fas fa-step-backward fa-lg"></i>
+                                            </button>
+                                            <button id="playPauseBtn" class="btn btn-success btn-lg rounded-circle me-3" disabled>
+                                                <i class="fas fa-play"></i>
+                                            </button>
+                                            <button id="nextBtn" class="btn btn-link text-light" disabled>
+                                                <i class="fas fa-step-forward fa-lg"></i>
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- Progress bar -->
+                                        <div class="progress-container">
+                                            <div class="d-flex align-items-center">
+                                                <span id="currentTime" class="small me-2">0:00</span>
+                                                <div class="progress flex-grow-1" style="height: 6px;">
+                                                    <div id="progressBar" class="progress-bar bg-success" role="progressbar" style="width: 0%"></div>
+                                                </div>
+                                                <span id="totalTime" class="small ms-2">0:00</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Volume control -->
+                                <div class="col-md-3">
+                                    <div class="d-flex align-items-center justify-content-end">
+                                        <i class="fas fa-volume-up me-2"></i>
+                                        <input type="range" id="volumeSlider" class="form-range" min="0" max="100" value="70" style="width: 100px;">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading spinner -->
+    <div id="loadingSpinner" class="d-none">
+        <div class="spinner-border text-success" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/player.js') }}"></script>
+</body>
+</html>
