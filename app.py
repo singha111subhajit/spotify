@@ -1,6 +1,9 @@
 from flask import Flask, render_template, jsonify, send_from_directory
 import os
-import json
+import urllib.parse
+from mutagen.mp3 import MP3
+from mutagen.id3 import ID3, TIT2, TPE1
+
 
 app = Flask(__name__)
 
@@ -12,56 +15,60 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
+
 def get_song_list():
-    """Get list of songs from the songs folder"""
     songs = []
     songs_path = os.path.join(app.static_folder, 'songs')
-    
-    # Create songs directory if it doesn't exist
+
     if not os.path.exists(songs_path):
         os.makedirs(songs_path)
         return songs
-    
-    # Sample song data (in real app, you'd extract metadata from MP3 files)
-    sample_songs = [
-        {
-            "id": 1,
-            "title": "Summer Vibes",
-            "artist": "Chill Beats",
-            "filename": "summer_vibes.mp3",
-            "duration": "3:24"
-        },
-        {
-            "id": 2,
-            "title": "Midnight Drive",
-            "artist": "Synthwave Collective",
-            "filename": "midnight_drive.mp3",
-            "duration": "4:15"
-        },
-        {
-            "id": 3,
-            "title": "Coffee Shop Jazz",
-            "artist": "Jazz Ensemble",
-            "filename": "coffee_shop_jazz.mp3",
-            "duration": "5:02"
-        },
-        {
-            "id": 4,
-            "title": "Digital Dreams",
-            "artist": "Electronic Paradise",
-            "filename": "digital_dreams.mp3",
-            "duration": "3:45"
-        },
-        {
-            "id": 5,
-            "title": "Acoustic Sunset",
-            "artist": "Folk & Friends",
-            "filename": "acoustic_sunset.mp3",
-            "duration": "4:38"
-        }
-    ]
-    
-    return sample_songs
+
+    for i, filename in enumerate(os.listdir(songs_path), start=1):
+        if allowed_file(filename):
+            file_path = os.path.join(songs_path, filename)
+            title = None
+            artist = None
+            duration = None
+
+            try:
+                # Load MP3 and extract duration
+                audio = MP3(file_path)
+                duration = audio.info.length
+                minutes = int(duration // 60)
+                seconds = int(duration % 60)
+                duration_str = f"{minutes}:{seconds:02}"
+                
+                # Try to extract ID3 tags (title, artist)
+                tags = ID3(file_path)
+                title = tags.get("TIT2")
+                artist = tags.get("TPE1")
+                title = title.text[0] if title else None
+                artist = artist.text[0] if artist else None
+
+            except Exception as e:
+                print(f"Warning: Could not read tags from {filename}: {e}")
+                duration_str = "Unknown"
+
+            # Fall back to filename if tags are missing
+            base_name = os.path.splitext(filename)[0]
+            pretty_title = title or base_name.replace('_', ' ').replace('-', ' ').title()
+            pretty_artist = artist or "Unknown Artist"
+
+            encoded_filename = urllib.parse.quote(filename)
+
+            songs.append({
+                "id": i,
+                "title": pretty_title,
+                "artist": pretty_artist,
+                "filename": encoded_filename,
+                "duration": duration_str
+            })
+
+    return songs
+
+
 
 @app.route('/')
 def index():
@@ -80,4 +87,4 @@ def serve_song(filename):
     return send_from_directory(os.path.join(app.static_folder, 'songs'), filename)
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5600)
