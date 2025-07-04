@@ -14,6 +14,7 @@ class MusicPlayer {
         
         // Set initial volume
         this.audio.volume = this.volume;
+        this.isLoading = false;
     }
     
     initializeElements() {
@@ -147,33 +148,33 @@ class MusicPlayer {
 }
 
     
-    playSong(index) {
-        if (index < 0 || index >= this.songs.length) {
-            console.error('Invalid song index:', index);
-            return;
-        }
-        
-        const song = this.songs[index];
-        
-        // Update current song index
-        this.currentSongIndex = index;
-        
-        // Update audio source
-        this.audio.src = `/songs/${song.filename}`;
-        
-        // Update UI
-        this.updateSongInfo(song);
-        this.updateActiveItem();
-        this.enableControls();
-        
-        // Play the audio
-        this.audio.play().catch(error => {
-            console.error('Error playing audio:', error);
-            this.showError('Failed to play this song. The file might be missing or corrupted.');
-        });
-        
-        console.log('Playing song:', song.title);
+    async playSong(index) {
+    if (this.isLoading) return; // avoid overlapping play requests
+    if (index < 0 || index >= this.songs.length) {
+        console.error('Invalid song index:', index);
+        return;
     }
+
+    this.isLoading = true;
+
+    const song = this.songs[index];
+    this.currentSongIndex = index;
+    this.audio.src = `/songs/${song.filename}`;
+    this.updateSongInfo(song);
+    this.updateActiveItem();
+    this.enableControls();
+
+    try {
+        await this.audio.play();
+        console.log('Playing song:', song.title);
+    } catch (error) {
+        console.error('Error playing audio:', error);
+        this.showError('Failed to play this song. The file might be missing or corrupted.');
+    } finally {
+        this.isLoading = false;
+    }
+}
+
     
     togglePlayPause() {
         if (this.currentSongIndex === -1) {
