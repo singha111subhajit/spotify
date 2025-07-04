@@ -108,6 +108,7 @@ class MusicPlayer {
             
             this.songs = await response.json();
             this.renderSongList();
+            this.setupSearch(); 
             this.hideLoading();
             
             console.log('Songs loaded:', this.songs);
@@ -118,32 +119,33 @@ class MusicPlayer {
         }
     }
     
-    renderSongList() {
-        if (!this.songs || this.songs.length === 0) {
-            this.songList.innerHTML = '<div class="text-muted text-center p-3">No songs available</div>';
-            return;
-        }
-        
-        this.songList.innerHTML = this.songs.map((song, index) => `
-            <div class="song-item" data-index="${index}" data-song-id="${song.id}">
-                <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <div class="song-title">${this.escapeHtml(song.title)}</div>
-                        <div class="song-artist">${this.escapeHtml(song.artist)}</div>
-                    </div>
-                    <div class="song-duration ms-2">${song.duration}</div>
-                </div>
-            </div>
-        `).join('');
-        
-        // Add click events to song items
-        this.songList.querySelectorAll('.song-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                const index = parseInt(e.currentTarget.dataset.index);
-                this.playSong(index);
-            });
-        });
+    renderSongList(songsToRender = this.songs) {
+    if (!songsToRender || songsToRender.length === 0) {
+        this.songList.innerHTML = '<div class="text-muted text-center p-3">No songs found</div>';
+        return;
     }
+
+    this.songList.innerHTML = songsToRender.map((song, index) => `
+        <div class="song-item" data-index="${index}" data-song-id="${song.id}">
+            <div class="d-flex align-items-center">
+                <div class="flex-grow-1">
+                    <div class="song-title">${this.escapeHtml(song.title)}</div>
+                    <div class="song-artist">${this.escapeHtml(song.artist)}</div>
+                </div>
+                <div class="song-duration ms-2">${song.duration}</div>
+            </div>
+        </div>
+    `).join('');
+
+    // Add click events to song items
+    this.songList.querySelectorAll('.song-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            const index = parseInt(e.currentTarget.dataset.index);
+            this.playSong(index);
+        });
+    });
+}
+
     
     playSong(index) {
         if (index < 0 || index >= this.songs.length) {
@@ -312,6 +314,23 @@ class MusicPlayer {
         div.textContent = text;
         return div.innerHTML;
     }
+
+    setupSearch() {
+    const searchInput = document.getElementById('searchInput');
+    if (!searchInput) return;
+
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase().trim();
+
+        const filtered = this.songs.filter(song =>
+            song.title.toLowerCase().includes(query) ||
+            song.artist.toLowerCase().includes(query)
+        );
+
+        this.renderSongList(filtered);
+    });
+}
+
 }
 
 // Initialize the music player when the DOM is loaded
