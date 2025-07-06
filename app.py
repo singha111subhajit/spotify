@@ -117,13 +117,16 @@ def search_internet_archive(query, page=1, rows=20):
     try:
         print(f"Searching Internet Archive for: '{query}'")
         
+        # Internet Archive uses 'start' not 'page' for pagination
+        start_offset = (page - 1) * rows
+        
         # Simplified and more flexible search query
         params = {
             'q': f'{query} AND mediatype:audio',
             'fl': 'identifier,title,creator,date,description,downloads',
             'sort': 'downloads desc',
             'rows': rows,
-            'page': page,
+            'start': start_offset,  # Use 'start' instead of 'page'
             'output': 'json'
         }
         
@@ -131,11 +134,16 @@ def search_internet_archive(query, page=1, rows=20):
         
         response = requests.get(SEARCH_URL, params=params, timeout=15)
         print(f"API Response status: {response.status_code}")
+        print(f"Response URL: {response.url}")
         
         if response.status_code == 200:
             data = response.json()
-            docs = data.get('docs', [])
-            total_found = data.get('numFound', 0)
+            print(f"Raw response keys: {list(data.keys())}")
+            
+            # Internet Archive API returns data in 'response' wrapper
+            response_data = data.get('response', {})
+            docs = response_data.get('docs', [])
+            total_found = response_data.get('numFound', 0)
             
             print(f"Found {total_found} total results, processing {len(docs)} items")
             
@@ -203,7 +211,11 @@ def get_popular_songs(limit=10):
         response = requests.get(SEARCH_URL, params=params, timeout=15)
         if response.status_code == 200:
             data = response.json()
-            docs = data.get('docs', [])
+            print(f"Popular songs response keys: {list(data.keys())}")
+            
+            # Internet Archive API returns data in 'response' wrapper
+            response_data = data.get('response', {})
+            docs = response_data.get('docs', [])
             
             print(f"Got {len(docs)} popular songs from API")
             
@@ -375,6 +387,41 @@ def debug_search(query):
             'total_available': total,
             'songs': songs
         })
+    except Exception as e:
+        import traceback
+        print(f"Debug search error: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# Raw API test endpoint
+@app.route('/api/debug/raw/<query>')
+def debug_raw(query):
+    """Test raw API response"""
+    try:
+        params = {
+            'q': f'{query} AND mediatype:audio',
+            'fl': 'identifier,title,creator',
+            'rows': 3,
+            'output': 'json'
+        }
+        
+        response = requests.get(SEARCH_URL, params=params, timeout=15)
+        
+        if response.status_code == 200:
+            data = response.json()
+            return jsonify({
+                'status': 'success',
+                'response_keys': list(data.keys()),
+                'raw_response': data,
+                'url_used': response.url
+            })
+        else:
+            return jsonify({
+                'status': 'failed',
+                'status_code': response.status_code,
+                'response_text': response.text[:500]
+            })
+            
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
