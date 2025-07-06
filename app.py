@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, send_from_directory, request
+THIS SHOULD BE A LINTER ERRORfrom flask import Flask, render_template, jsonify, send_from_directory, request
 from flask_cors import CORS
 import os
 import urllib.parse
@@ -86,30 +86,66 @@ def get_song_url_from_archive(identifier):
             files_data = response.json()
             files = files_data.get('files', [])
             
-            # Find MP3 file - be more flexible with formats
-            mp3_file = None
-            for file in files:
-                file_name = file.get('name', '').lower()
-                file_format = file.get('format', '').lower()
-                
-                if (file_format in ['vbr mp3', 'mp3', 'mpeg audio'] or 
-                    file_name.endswith('.mp3') or 
-                    file_name.endswith('.m4a')):
-                    mp3_file = file
+            # Look for audio files with more flexibility
+            audio_file = None
+            
+            # Priority order for audio file selection
+            audio_formats = [
+                'VBR MP3', 'MP3', 'Ogg Vorbis', 'MPEG Audio', 
+                'WAVE', 'FLAC', 'M4A', 'AAC'
+            ]
+            
+            audio_extensions = ['.mp3', '.ogg', '.wav', '.flac', '.m4a', '.aac']
+            
+            # First, try to find files by format
+            for format_type in audio_formats:
+                for file in files:
+                    if file.get('format', '').upper() == format_type.upper():
+                        audio_file = file
+                        break
+                if audio_file:
                     break
             
-            if mp3_file:
-                file_url = f"{INTERNET_ARCHIVE_BASE_URL}/download/{identifier}/{urllib.parse.quote(mp3_file['name'])}"
-                print(f"Found audio file for {identifier}: {mp3_file['name']}")
+            # If no format match, try by file extension
+            if not audio_file:
+                for extension in audio_extensions:
+                    for file in files:
+                        file_name = file.get('name', '').lower()
+                        if file_name.endswith(extension):
+                            audio_file = file
+                            break
+                    if audio_file:
+                        break
+            
+            # If still no audio file, try looking for any file with audio keywords
+            if not audio_file:
+                audio_keywords = ['audio', 'song', 'music', 'track']
+                for file in files:
+                    file_name = file.get('name', '').lower()
+                    file_format = file.get('format', '').lower()
+                    
+                    if any(keyword in file_name or keyword in file_format for keyword in audio_keywords):
+                        # Avoid text files, images, etc.
+                        if not any(ext in file_name for ext in ['.txt', '.pdf', '.jpg', '.png', '.gif', '.xml', '.json']):
+                            audio_file = file
+                            break
+            
+            if audio_file:
+                file_url = f"{INTERNET_ARCHIVE_BASE_URL}/download/{identifier}/{urllib.parse.quote(audio_file['name'])}"
+                print(f"Found audio file for {identifier}: {audio_file['name']} (format: {audio_file.get('format', 'unknown')})")
                 return file_url
             else:
-                print(f"No audio file found for {identifier}")
-                # Return a placeholder URL that might work
-                return f"{INTERNET_ARCHIVE_BASE_URL}/download/{identifier}"
+                # Last resort: try common file patterns
+                common_patterns = [f"{identifier}.mp3", f"{identifier}.ogg", "01.mp3", "track01.mp3"]
+                for pattern in common_patterns:
+                    test_url = f"{INTERNET_ARCHIVE_BASE_URL}/download/{identifier}/{pattern}"
+                    print(f"Trying fallback URL for {identifier}: {pattern}")
+                    return test_url
                 
     except Exception as e:
         print(f"Error getting song URL for {identifier}: {e}")
     
+    print(f"No audio file found for {identifier}")
     return None
 
 def search_internet_archive(query, page=1, rows=20):
@@ -120,7 +156,7 @@ def search_internet_archive(query, page=1, rows=20):
         # Internet Archive uses 'start' not 'page' for pagination
         start_offset = (page - 1) * rows
         
-        # Simplified and more flexible search query
+        # Keep the search simple but effective
         params = {
             'q': f'{query} AND mediatype:audio',
             'fl': 'identifier,title,creator,date,description,downloads',
@@ -148,44 +184,53 @@ def search_internet_archive(query, page=1, rows=20):
             print(f"Found {total_found} total results, processing {len(docs)} items")
             
             songs = []
+            processed_count = 0
+            
             for item in docs:
                 identifier = item.get('identifier')
                 if not identifier:
                     continue
                 
-                # Create song entry even if we can't get direct URL
-                song = {
-                    "id": identifier,
-                    "title": item.get('title', 'Unknown Title'),
-                    "artist": item.get('creator', ['Unknown Artist'])[0] if isinstance(item.get('creator'), list) else item.get('creator', 'Unknown Artist'),
-                    "url": f"{INTERNET_ARCHIVE_BASE_URL}/download/{identifier}",  # Default URL
-                    "source": "api",
-                    "album": None,
-                    "year": None,
-                    "thumbnail": f"{INTERNET_ARCHIVE_BASE_URL}/services/img/{identifier}"
-                }
+                processed_count += 1
                 
-                # Try to get a better URL, but don't fail if we can't
+                # Try to get a working audio URL
+                song_url = None
                 try:
-                    better_url = get_song_url_from_archive(identifier)
-                    if better_url:
-                        song["url"] = better_url
+                    song_url = get_song_url_from_archive(identifier)
                 except:
-                    pass  # Use default URL
+                    pass
                 
-                # Extract year if available
-                if item.get('date'):
-                    try:
-                        song["year"] = int(item['date'][:4])
-                    except:
-                        pass
+                # Only add songs that have a potential audio URL
+                if song_url:
+                    song = {
+                        "id": identifier,
+                        "title": item.get('title', 'Unknown Title'),
+                        "artist": item.get('creator', ['Unknown Artist'])[0] if isinstance(item.get('creator'), list) else item.get('creator', 'Unknown Artist'),
+                        "url": song_url,
+                        "source": "api",
+                        "album": None,
+                        "year": None,
+                        "thumbnail": f"{INTERNET_ARCHIVE_BASE_URL}/services/img/{identifier}"
+                    }
+                    
+                    # Extract year if available
+                    if item.get('date'):
+                        try:
+                            song["year"] = int(item['date'][:4])
+                        except:
+                            pass
+                    
+                    songs.append(song)
                 
-                songs.append(song)
+                # Add delay every few items
+                if processed_count % 5 == 0:
+                    time.sleep(0.2)
                 
-                # Add small delay to be respectful to the API
-                time.sleep(0.1)
+                # If we have enough songs, break early to improve performance
+                if len(songs) >= 10:
+                    break
             
-            print(f"Returning {len(songs)} songs")
+            print(f"Returning {len(songs)} playable songs out of {processed_count} processed")
             return songs, total_found
             
     except Exception as e:
@@ -200,11 +245,12 @@ def get_popular_songs(limit=10):
     try:
         print(f"Fetching {limit} popular songs...")
         
+        # Use a broader search for better chances of finding playable audio
         params = {
-            'q': 'mediatype:audio AND collection:opensource_audio',
+            'q': 'mediatype:audio AND (collection:opensource_audio OR collection:etree)',
             'fl': 'identifier,title,creator,date,description,downloads',
             'sort': 'downloads desc',
-            'rows': limit,
+            'rows': limit * 3,  # Get more to filter for working ones
             'output': 'json'
         }
         
@@ -217,38 +263,56 @@ def get_popular_songs(limit=10):
             response_data = data.get('response', {})
             docs = response_data.get('docs', [])
             
-            print(f"Got {len(docs)} popular songs from API")
+            print(f"Got {len(docs)} potential popular songs from API")
             
             songs = []
-            for i, item in enumerate(docs):
+            processed_count = 0
+            
+            for item in docs:
                 identifier = item.get('identifier')
                 if not identifier:
                     continue
                 
-                song = {
-                    "id": identifier,
-                    "title": item.get('title', 'Unknown Title'),
-                    "artist": item.get('creator', ['Unknown Artist'])[0] if isinstance(item.get('creator'), list) else item.get('creator', 'Unknown Artist'),
-                    "url": f"{INTERNET_ARCHIVE_BASE_URL}/download/{identifier}",
-                    "source": "api",
-                    "album": None,
-                    "year": None,
-                    "thumbnail": f"{INTERNET_ARCHIVE_BASE_URL}/services/img/{identifier}"
-                }
+                processed_count += 1
                 
-                # Extract year if available
-                if item.get('date'):
-                    try:
-                        song["year"] = int(item['date'][:4])
-                    except:
-                        pass
+                # Try to get a working audio URL - but don't spend too much time
+                song_url = None
+                try:
+                    song_url = get_song_url_from_archive(identifier)
+                except:
+                    pass
                 
-                songs.append(song)
+                # Only add songs with working URLs
+                if song_url:
+                    song = {
+                        "id": identifier,
+                        "title": item.get('title', 'Unknown Title'),
+                        "artist": item.get('creator', ['Unknown Artist'])[0] if isinstance(item.get('creator'), list) else item.get('creator', 'Unknown Artist'),
+                        "url": song_url,
+                        "source": "api",
+                        "album": None,
+                        "year": None,
+                        "thumbnail": f"{INTERNET_ARCHIVE_BASE_URL}/services/img/{identifier}"
+                    }
+                    
+                    # Extract year if available
+                    if item.get('date'):
+                        try:
+                            song["year"] = int(item['date'][:4])
+                        except:
+                            pass
+                    
+                    songs.append(song)
+                
+                # Stop if we have enough songs or processed enough items
+                if len(songs) >= limit or processed_count >= limit * 2:
+                    break
                 
                 # Small delay every few items
-                if i > 0 and i % 3 == 0:
+                if processed_count % 3 == 0:
                     time.sleep(0.2)
             
+            print(f"Returning {len(songs)} playable popular songs out of {processed_count} processed")
             return songs
             
     except Exception as e:
@@ -420,6 +484,43 @@ def debug_raw(query):
                 'status': 'failed',
                 'status_code': response.status_code,
                 'response_text': response.text[:500]
+            })
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Debug endpoint to inspect files in an archive item
+@app.route('/api/debug/files/<identifier>')
+def debug_files(identifier):
+    """Debug endpoint to see what files are in an archive item"""
+    try:
+        response = requests.get(f'{METADATA_URL}/{identifier}/files', timeout=10)
+        
+        if response.status_code == 200:
+            files_data = response.json()
+            files = files_data.get('files', [])
+            
+            # Analyze the files
+            file_info = []
+            for file in files[:20]:  # Limit to first 20 files
+                file_info.append({
+                    'name': file.get('name', 'No name'),
+                    'format': file.get('format', 'Unknown'),
+                    'size': file.get('size', 'Unknown'),
+                    'is_audio': any(ext in file.get('name', '').lower() for ext in ['.mp3', '.ogg', '.wav', '.flac', '.m4a'])
+                })
+            
+            return jsonify({
+                'identifier': identifier,
+                'total_files': len(files),
+                'files_shown': len(file_info),
+                'files': file_info,
+                'metadata_url': f'{METADATA_URL}/{identifier}/files'
+            })
+        else:
+            return jsonify({
+                'error': f'Failed to get files for {identifier}',
+                'status_code': response.status_code
             })
             
     except Exception as e:
