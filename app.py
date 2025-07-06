@@ -1,4 +1,4 @@
-THIS SHOULD BE A LINTER ERRORfrom flask import Flask, render_template, jsonify, send_from_directory, request
+from flask import Flask, render_template, jsonify, send_from_directory, request
 from flask_cors import CORS
 import os
 import urllib.parse
@@ -135,12 +135,7 @@ def get_song_url_from_archive(identifier):
                 print(f"Found audio file for {identifier}: {audio_file['name']} (format: {audio_file.get('format', 'unknown')})")
                 return file_url
             else:
-                # Last resort: try common file patterns
-                common_patterns = [f"{identifier}.mp3", f"{identifier}.ogg", "01.mp3", "track01.mp3"]
-                for pattern in common_patterns:
-                    test_url = f"{INTERNET_ARCHIVE_BASE_URL}/download/{identifier}/{pattern}"
-                    print(f"Trying fallback URL for {identifier}: {pattern}")
-                    return test_url
+                print(f"No audio file found for {identifier} - skipping")
                 
     except Exception as e:
         print(f"Error getting song URL for {identifier}: {e}")
@@ -202,11 +197,14 @@ def search_internet_archive(query, page=1, rows=20):
                 
                 # Only add songs that have a potential audio URL
                 if song_url:
+                    # Convert to proxy URL to bypass CORS
+                    proxy_url = f"/proxy/audio/{urllib.parse.quote(song_url, safe='')}"
+                    
                     song = {
                         "id": identifier,
                         "title": item.get('title', 'Unknown Title'),
                         "artist": item.get('creator', ['Unknown Artist'])[0] if isinstance(item.get('creator'), list) else item.get('creator', 'Unknown Artist'),
-                        "url": song_url,
+                        "url": proxy_url,
                         "source": "api",
                         "album": None,
                         "year": None,
@@ -247,7 +245,7 @@ def get_popular_songs(limit=10):
         
         # Use a broader search for better chances of finding playable audio
         params = {
-            'q': 'mediatype:audio AND (collection:opensource_audio OR collection:etree)',
+            'q': 'mediatype:audio',
             'fl': 'identifier,title,creator,date,description,downloads',
             'sort': 'downloads desc',
             'rows': limit * 3,  # Get more to filter for working ones
@@ -284,11 +282,14 @@ def get_popular_songs(limit=10):
                 
                 # Only add songs with working URLs
                 if song_url:
+                    # Convert to proxy URL to bypass CORS
+                    proxy_url = f"/proxy/audio/{urllib.parse.quote(song_url, safe='')}"
+                    
                     song = {
                         "id": identifier,
                         "title": item.get('title', 'Unknown Title'),
                         "artist": item.get('creator', ['Unknown Artist'])[0] if isinstance(item.get('creator'), list) else item.get('creator', 'Unknown Artist'),
-                        "url": song_url,
+                        "url": proxy_url,
                         "source": "api",
                         "album": None,
                         "year": None,
@@ -429,6 +430,54 @@ def serve_song(filename):
     """Serve static audio files"""
     return send_from_directory(os.path.join(app.static_folder, 'songs'), filename)
 
+@app.route('/proxy/audio/<path:audio_url>')
+def proxy_audio(audio_url):
+    """Proxy audio files from Internet Archive to bypass CORS"""
+    try:
+        # Decode the URL
+        decoded_url = urllib.parse.unquote(audio_url)
+        
+        print(f"Proxying audio from: {decoded_url}")
+        
+        # Stream the audio file
+        response = requests.get(decoded_url, stream=True, timeout=30)
+        
+        if response.status_code == 200:
+            # Forward the audio stream with proper headers
+            def generate():
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        yield chunk
+            
+            # Get content type from original response
+            content_type = response.headers.get('content-type', 'audio/mpeg')
+            
+            flask_response = app.response_class(
+                generate(),
+                mimetype=content_type,
+                headers={
+                    'Accept-Ranges': 'bytes',
+                    'Cache-Control': 'public, max-age=3600',
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET',
+                    'Access-Control-Allow-Headers': 'Range'
+                }
+            )
+            
+            # Handle range requests for audio seeking
+            if 'range' in request.headers:
+                flask_response.status_code = 206
+                flask_response.headers['Content-Range'] = response.headers.get('Content-Range', '')
+            
+            return flask_response
+        else:
+            print(f"Failed to fetch audio: {response.status_code}")
+            return jsonify({'error': f'Failed to fetch audio: {response.status_code}'}), response.status_code
+            
+    except Exception as e:
+        print(f"Error proxying audio: {e}")
+        return jsonify({'error': 'Failed to proxy audio'}), 500
+
 @app.route('/')
 def index():
     """Serve the main page - will serve React app in production"""
@@ -502,19 +551,33 @@ def debug_files(identifier):
             
             # Analyze the files
             file_info = []
+            audio_files = []
+            
             for file in files[:20]:  # Limit to first 20 files
+                is_audio = any(ext in file.get('name', '').lower() for ext in ['.mp3', '.ogg', '.wav', '.flac', '.m4a'])
+                
                 file_info.append({
                     'name': file.get('name', 'No name'),
                     'format': file.get('format', 'Unknown'),
                     'size': file.get('size', 'Unknown'),
-                    'is_audio': any(ext in file.get('name', '').lower() for ext in ['.mp3', '.ogg', '.wav', '.flac', '.m4a'])
+                    'is_audio': is_audio
                 })
+                
+                if is_audio:
+                    direct_url = f"{INTERNET_ARCHIVE_BASE_URL}/download/{identifier}/{urllib.parse.quote(file['name'])}"
+                    proxy_url = f"/proxy/audio/{urllib.parse.quote(direct_url, safe='')}"
+                    audio_files.append({
+                        'name': file.get('name'),
+                        'direct_url': direct_url,
+                        'proxy_url': proxy_url
+                    })
             
             return jsonify({
                 'identifier': identifier,
                 'total_files': len(files),
                 'files_shown': len(file_info),
                 'files': file_info,
+                'audio_files_found': audio_files,
                 'metadata_url': f'{METADATA_URL}/{identifier}/files'
             })
         else:
@@ -525,6 +588,19 @@ def debug_files(identifier):
             
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# Test proxy endpoint
+@app.route('/api/test/proxy')
+def test_proxy():
+    """Test the proxy functionality with a known working URL"""
+    test_url = "https://archive.org/download/cd_aashiqui_nadeem-shravan-anuradha-paudwal-jolly-mukh/cd_aashiqui_101_nasha-hai.mp3"
+    proxy_url = f"/proxy/audio/{urllib.parse.quote(test_url, safe='')}"
+    
+    return jsonify({
+        'test_direct_url': test_url,
+        'test_proxy_url': proxy_url,
+        'instructions': 'Try accessing the proxy_url in your browser or audio player'
+    })
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5600)
