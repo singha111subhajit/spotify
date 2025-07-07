@@ -190,7 +190,11 @@ function App() {
               src={currentSong.url}
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
-              crossOrigin="anonymous"
+              onError={(e) => {
+                console.error('Audio error:', e);
+                console.log('Failed URL:', currentSong.url);
+              }}
+              onLoadStart={() => console.log('Loading audio:', currentSong.url)}
             />
           </>
         ) : (

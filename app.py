@@ -163,13 +163,13 @@ def search_internet_archive(query, page=1, rows=20):
             processed_count = 0
             
             # Add some demo songs for common searches while we fix Internet Archive
-            if any(term in query.lower() for term in ['tum hi ho', 'aashiqui', 'bollywood', 'hindi']):
+            if any(term in query.lower() for term in ['tum hi ho', 'aashiqui', 'bollywood', 'hindi', 'music', 'song']):
                 demo_songs = [
                     {
                         "id": "demo-tum-hi-ho",
                         "title": "Tum Hi Ho (Demo Sample)",
                         "artist": "Arijit Singh (Demo)",
-                        "url": "/proxy/audio/https%3A//www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+                        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
                         "source": "api",
                         "album": "Demo Content",
                         "year": 2013,
@@ -179,10 +179,20 @@ def search_internet_archive(query, page=1, rows=20):
                         "id": "demo-aashiqui",
                         "title": "Aashiqui Songs (Demo Sample)",  
                         "artist": "Various Artists (Demo)",
-                        "url": "/proxy/audio/https%3A//www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+                        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
                         "source": "api",
                         "album": "Demo Content", 
                         "year": 1990,
+                        "thumbnail": None
+                    },
+                    {
+                        "id": "demo-instrumental",
+                        "title": "Beautiful Instrumental (Demo)",  
+                        "artist": "Demo Orchestra",
+                        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+                        "source": "api",
+                        "album": "Demo Content", 
+                        "year": 2023,
                         "thumbnail": None
                     }
                 ]
@@ -257,7 +267,7 @@ def get_popular_songs(limit=10):
                 "id": "demo-popular-1",
                 "title": "Demo Song 1 (Sample Audio)",
                 "artist": "Demo Artist",
-                "url": "/proxy/audio/https%3A//www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+                "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
                 "source": "api",
                 "album": "Demo Album",
                 "year": 2023,
@@ -267,7 +277,7 @@ def get_popular_songs(limit=10):
                 "id": "demo-popular-2", 
                 "title": "Demo Song 2 (Sample Audio)",
                 "artist": "Demo Artist 2",
-                "url": "/proxy/audio/https%3A//www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+                "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
                 "source": "api",
                 "album": "Demo Album",
                 "year": 2023,
@@ -278,86 +288,9 @@ def get_popular_songs(limit=10):
         print(f"Providing {len(demo_popular_songs)} demo popular songs")
         return demo_popular_songs
         
-        # Commented out Internet Archive search while we fix the issues
-        """
-        # Search for collections with actual audio files
-        params = {
-            'q': 'mediatype:audio AND (collection:opensource_media OR collection:netlabels OR collection:audio_music OR format:"VBR MP3" OR format:"MP3")',
-            'fl': 'identifier,title,creator,date,description,downloads,format',
-            'sort': 'downloads desc',
-            'rows': limit * 3,  # Get more to filter for working ones
-            'output': 'json'
-        }
-        
-        response = requests.get(SEARCH_URL, params=params, timeout=15)
-        if response.status_code == 200:
-            data = response.json()
-            print(f"Popular songs response keys: {list(data.keys())}")
-            
-            # Internet Archive API returns data in 'response' wrapper
-            response_data = data.get('response', {})
-            docs = response_data.get('docs', [])
-            
-            print(f"Got {len(docs)} potential popular songs from API")
-            
-            songs = []
-            processed_count = 0
-            
-            for item in docs:
-                identifier = item.get('identifier')
-                if not identifier:
-                    continue
-                
-                processed_count += 1
-                
-                # Try to get a working audio URL - but don't spend too much time
-                song_url = None
-                try:
-                    song_url = get_song_url_from_archive(identifier)
-                except:
-                    pass
-                
-                # Only add songs with working URLs
-                if song_url:
-                    # Convert to proxy URL to bypass CORS
-                    proxy_url = f"/proxy/audio/{urllib.parse.quote(song_url, safe='')}"
-                    
-                    song = {
-                        "id": identifier,
-                        "title": item.get('title', 'Unknown Title'),
-                        "artist": item.get('creator', ['Unknown Artist'])[0] if isinstance(item.get('creator'), list) else item.get('creator', 'Unknown Artist'),
-                        "url": proxy_url,
-                        "source": "api",
-                        "album": None,
-                        "year": None,
-                        "thumbnail": f"{INTERNET_ARCHIVE_BASE_URL}/services/img/{identifier}"
-                    }
-                    
-                    # Extract year if available
-                    if item.get('date'):
-                        try:
-                            song["year"] = int(item['date'][:4])
-                        except:
-                            pass
-                    
-                    songs.append(song)
-                
-                # Stop if we have enough songs or processed enough items
-                if len(songs) >= limit or processed_count >= limit * 2:
-                    break
-                
-                # Small delay every few items
-                if processed_count % 3 == 0:
-                    time.sleep(0.2)
-            
-            print(f"Returning {len(songs)} playable popular songs out of {processed_count} processed")
-            return songs
-            
     except Exception as e:
         print(f"Error fetching popular songs: {e}")
-    
-    return []
-    """
+        return []
 
 # API Routes
 @app.route('/api/songs')
@@ -470,17 +403,33 @@ def serve_song(filename):
 
 @app.route('/proxy/audio/<path:audio_url>')
 def proxy_audio(audio_url):
-    """Proxy audio files from Internet Archive to bypass CORS"""
+    """Proxy audio files from external sources to bypass CORS"""
     try:
         # Decode the URL
         decoded_url = urllib.parse.unquote(audio_url)
         
         print(f"Proxying audio from: {decoded_url}")
         
-        # Stream the audio file
-        response = requests.get(decoded_url, stream=True, timeout=30)
+        # Add headers to mimic a real browser request
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'audio/webm,audio/ogg,audio/wav,audio/*;q=0.9,application/ogg;q=0.7,video/*;q=0.6,*/*;q=0.5',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'identity',
+            'Range': request.headers.get('Range', '')
+        }
         
-        if response.status_code == 200:
+        # Remove empty range header
+        if not headers['Range']:
+            del headers['Range']
+        
+        # Stream the audio file
+        response = requests.get(decoded_url, stream=True, timeout=30, headers=headers)
+        
+        print(f"Remote response status: {response.status_code}")
+        print(f"Remote response headers: {dict(response.headers)}")
+        
+        if response.status_code in [200, 206]:
             # Forward the audio stream with proper headers
             def generate():
                 for chunk in response.iter_content(chunk_size=8192):
@@ -492,28 +441,29 @@ def proxy_audio(audio_url):
             
             flask_response = app.response_class(
                 generate(),
+                status=response.status_code,
                 mimetype=content_type,
                 headers={
                     'Accept-Ranges': 'bytes',
                     'Cache-Control': 'public, max-age=3600',
                     'Access-Control-Allow-Origin': '*',
                     'Access-Control-Allow-Methods': 'GET',
-                    'Access-Control-Allow-Headers': 'Range'
+                    'Access-Control-Allow-Headers': 'Range',
+                    'Content-Length': response.headers.get('Content-Length', ''),
+                    'Content-Range': response.headers.get('Content-Range', '')
                 }
             )
-            
-            # Handle range requests for audio seeking
-            if 'range' in request.headers:
-                flask_response.status_code = 206
-                flask_response.headers['Content-Range'] = response.headers.get('Content-Range', '')
             
             return flask_response
         else:
             print(f"Failed to fetch audio: {response.status_code}")
+            print(f"Response text: {response.text[:200]}")
             return jsonify({'error': f'Failed to fetch audio: {response.status_code}'}), response.status_code
             
     except Exception as e:
         print(f"Error proxying audio: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': 'Failed to proxy audio'}), 500
 
 @app.route('/')
@@ -631,13 +581,22 @@ def debug_files(identifier):
 @app.route('/api/test/proxy')
 def test_proxy():
     """Test the proxy functionality with a known working URL"""
-    test_url = "https://archive.org/download/cd_aashiqui_nadeem-shravan-anuradha-paudwal-jolly-mukh/cd_aashiqui_101_nasha-hai.mp3"
+    test_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
     proxy_url = f"/proxy/audio/{urllib.parse.quote(test_url, safe='')}"
     
     return jsonify({
         'test_direct_url': test_url,
         'test_proxy_url': proxy_url,
         'instructions': 'Try accessing the proxy_url in your browser or audio player'
+    })
+
+# Simple test endpoint
+@app.route('/api/test/simple')
+def test_simple():
+    """Simple test to verify Flask is working"""
+    return jsonify({
+        'status': 'Flask is working!',
+        'message': 'If you see this, the backend is running properly'
     })
 
 # Test new search strategy
@@ -689,6 +648,67 @@ def test_search_strategy(query):
             
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# Comprehensive test endpoint
+@app.route('/api/test/all')
+def test_all():
+    """Comprehensive test of all functionality"""
+    results = {}
+    
+    try:
+        # Test 1: Static songs
+        static_songs = get_static_songs()
+        results['static_songs'] = {
+            'status': 'success',
+            'count': len(static_songs),
+            'sample_songs': static_songs[:3] if static_songs else []
+        }
+    except Exception as e:
+        results['static_songs'] = {'status': 'error', 'error': str(e)}
+    
+    try:
+        # Test 2: Demo/Popular songs  
+        popular_songs = get_popular_songs(3)
+        results['popular_songs'] = {
+            'status': 'success',
+            'count': len(popular_songs),
+            'sample_songs': popular_songs
+        }
+    except Exception as e:
+        results['popular_songs'] = {'status': 'error', 'error': str(e)}
+    
+    try:
+        # Test 3: Search functionality
+        search_results, total = search_internet_archive('music', 1, 3)
+        results['search'] = {
+            'status': 'success',
+            'count': len(search_results),
+            'total_found': total,
+            'sample_results': search_results
+        }
+    except Exception as e:
+        results['search'] = {'status': 'error', 'error': str(e)}
+    
+    # Test 4: Basic app info
+    results['app_info'] = {
+        'status': 'success',
+        'static_folder': app.static_folder,
+        'songs_folder_exists': os.path.exists(os.path.join(app.static_folder, 'songs')),
+        'available_routes': [
+            '/api/songs',
+            '/api/search',
+            '/api/random',
+            '/api/health',
+            '/proxy/audio/<url>',
+            '/songs/<filename>'
+        ]
+    }
+    
+    return jsonify({
+        'overall_status': 'Backend is working!',
+        'timestamp': time.time(),
+        'test_results': results
+    })
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5600)
