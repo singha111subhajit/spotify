@@ -1,9 +1,9 @@
+
 from flask import Flask, render_template, jsonify, send_from_directory, request
 from flask_cors import CORS
 import os
 import urllib.parse
 import requests
-import time
 import random
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, TIT2, TPE1, TALB, TDRC, TYER, ID3NoHeaderError
@@ -15,10 +15,9 @@ CORS(app)  # Enable CORS for React frontend
 SONGS_FOLDER = 'static/songs'
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg'}
 
-# Internet Archive API Configuration
-INTERNET_ARCHIVE_BASE_URL = 'https://archive.org'
-SEARCH_URL = f'{INTERNET_ARCHIVE_BASE_URL}/advancedsearch.php'
-METADATA_URL = f'{INTERNET_ARCHIVE_BASE_URL}/metadata'
+
+# JioSaavn API endpoint (unofficial public API)
+JIOSAAVN_API_BASE = 'https://saavn.dev/api'
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -56,13 +55,27 @@ def get_static_songs():
                     artist = tags.get("TPE1") 
                     album = tags.get("TALB")
                     year_tag = tags.get("TDRC") or tags.get("TYER")
-                    
-                    title = title.text[0] if title else None
-                    artist = artist.text[0] if artist else None
-                    album = album.text[0] if album else None
-                    year = str(year_tag.text[0])[:4] if year_tag else None
-                    year = int(year) if year and year.isdigit() else None
-                    
+
+                    def extract_text(tag):
+                        if tag is None:
+                            return None
+                        val = tag.text[0] if hasattr(tag, 'text') and tag.text else tag
+                        if isinstance(val, bytes):
+                            try:
+                                return val.decode('utf-8', errors='ignore')
+                            except Exception:
+                                return str(val)
+                        return str(val)
+
+                    title = extract_text(title)
+                    artist = extract_text(artist)
+                    album = extract_text(album)
+                    year = extract_text(year_tag)
+                    if year:
+                        year = ''.join(filter(str.isdigit, year))[:4]
+                        year = int(year) if year.isdigit() else None
+                    else:
+                        year = None
                 except ID3NoHeaderError:
                     # File doesn't have ID3 tags, that's fine
                     pass
@@ -90,6 +103,7 @@ def get_static_songs():
             # Final fallbacks
             pretty_title = title or base_name.replace('_', ' ').replace('-', ' ').title()
             pretty_artist = artist or "Unknown Artist"
+            pretty_album = album or "Unknown Album"
 
             encoded_filename = urllib.parse.quote(filename)
 
@@ -97,7 +111,7 @@ def get_static_songs():
                 "id": f"static-{i}",
                 "title": pretty_title,
                 "artist": pretty_artist,
-                "album": album,
+                "album": pretty_album,
                 "year": year,
                 "duration": duration,
                 "url": f"/songs/{encoded_filename}",
@@ -109,182 +123,61 @@ def get_static_songs():
     print(f"Found {len(songs)} static songs")
     return songs
 
-def get_song_url_from_archive(identifier):
-    """Get direct MP3 URL from Internet Archive item - simplified approach"""
-    
-    # For now, let's create some demo content while we fix the Internet Archive issues
-    # This will ensure users have something to test with
-    
-    demo_songs = {
-        'tum-hi-ho': {
-            'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-            'title': 'Tum Hi Ho (Demo)',
-            'artist': 'Arijit Singh'
-        },
-        'aashiqui': {
-            'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', 
-            'title': 'Aashiqui Songs (Demo)',
-            'artist': 'Various Artists'
-        }
-    }
-    
-    # Check if this is a search we can provide demo content for
-    for search_term, demo_data in demo_songs.items():
-        if search_term in identifier.lower():
-            print(f"Providing demo content for {identifier}")
-            return demo_data['url']
-    
-    # Try a simple direct URL approach first
-    simple_patterns = [
-        f"{identifier}.mp3",
-        f"{identifier}.ogg"
-    ]
-    
-    for pattern in simple_patterns:
-        test_url = f"{INTERNET_ARCHIVE_BASE_URL}/download/{identifier}/{pattern}"
-        print(f"Testing direct URL: {test_url}")
-        try:
-            # Quick test with a HEAD request
-            head_response = requests.head(test_url, timeout=2)
-            if head_response.status_code == 200:
-                print(f"Found working direct URL for {identifier}: {pattern}")
-                return test_url
-        except:
-            continue
-    
-    print(f"No working URL found for {identifier}")
-    return None
-
-def search_internet_archive(query, page=1, rows=20):
-    """Search Internet Archive for music"""
+# --- JioSaavn API search ---
+def search_jiosaavn(query, page=1, per_page=20):
+    """Search for songs using the JioSaavn public API (unofficial)"""
     try:
-        print(f"Searching Internet Archive for: '{query}'")
-        
-        # Internet Archive uses 'start' not 'page' for pagination
-        start_offset = (page - 1) * rows
-        
-        # Use a simpler search that's more likely to work
+        print(f"Searching JioSaavn for: '{query}' (page={page}, per_page={per_page})")
         params = {
-            'q': f'{query} AND mediatype:audio',
-            'fl': 'identifier,title,creator,date,description,downloads',
-            'sort': 'downloads desc',
-            'rows': rows,
-            'start': start_offset,
-            'output': 'json'
+            'query': query,
+            'page': page
         }
-        
-        print(f"Search params: {params}")
-        
-        response = requests.get(SEARCH_URL, params=params, timeout=15)
-        print(f"API Response status: {response.status_code}")
-        print(f"Response URL: {response.url}")
-        
+        url = f"{JIOSAAVN_API_BASE}/search/songs"
+        response = requests.get(url, params=params, timeout=10)
+        print(f"JioSaavn API status: {response.status_code}")
         if response.status_code == 200:
             data = response.json()
-            print(f"Raw response keys: {list(data.keys())}")
-            
-            # Internet Archive API returns data in 'response' wrapper
-            response_data = data.get('response', {})
-            docs = response_data.get('docs', [])
-            total_found = response_data.get('numFound', 0)
-            
-            print(f"Found {total_found} total results, processing {len(docs)} items")
-            
+            print('JioSaavn API raw response:', data)  # DEBUG: print the full API response
             songs = []
-            processed_count = 0
-            
-            # Add some demo songs for common searches while we fix Internet Archive
-            if any(term in query.lower() for term in ['tum hi ho', 'aashiqui', 'bollywood', 'hindi', 'music', 'song']):
-                demo_songs = [
-                    {
-                        "id": "demo-tum-hi-ho",
-                        "title": "Tum Hi Ho (Demo Sample)",
-                        "artist": "Arijit Singh (Demo)",
-                        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-                        "source": "api",
-                        "album": "Demo Content",
-                        "year": 2013,
-                        "thumbnail": None
-                    },
-                    {
-                        "id": "demo-aashiqui",
-                        "title": "Aashiqui Songs (Demo Sample)",  
-                        "artist": "Various Artists (Demo)",
-                        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-                        "source": "api",
-                        "album": "Demo Content", 
-                        "year": 1990,
-                        "thumbnail": None
-                    },
-                    {
-                        "id": "demo-instrumental",
-                        "title": "Beautiful Instrumental (Demo)",  
-                        "artist": "Demo Orchestra",
-                        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-                        "source": "api",
-                        "album": "Demo Content", 
-                        "year": 2023,
-                        "thumbnail": None
-                    }
-                ]
-                songs.extend(demo_songs)
-                print(f"Added {len(demo_songs)} demo songs for query: {query}")
-            
-            for item in docs:
-                identifier = item.get('identifier')
-                if not identifier:
-                    continue
-                
-                processed_count += 1
-                
-                # Try to get a working audio URL
-                song_url = None
-                try:
-                    song_url = get_song_url_from_archive(identifier)
-                except:
-                    pass
-                
-                # Only add songs that have a potential audio URL
-                if song_url:
-                    # Convert to proxy URL to bypass CORS
-                    proxy_url = f"/proxy/audio/{urllib.parse.quote(song_url, safe='')}"
-                    
-                    song = {
-                        "id": identifier,
-                        "title": item.get('title', 'Unknown Title'),
-                        "artist": item.get('creator', ['Unknown Artist'])[0] if isinstance(item.get('creator'), list) else item.get('creator', 'Unknown Artist'),
-                        "url": proxy_url,
-                        "source": "api",
-                        "album": None,
-                        "year": None,
-                        "thumbnail": f"{INTERNET_ARCHIVE_BASE_URL}/services/img/{identifier}"
-                    }
-                    
-                    # Extract year if available
-                    if item.get('date'):
-                        try:
-                            song["year"] = int(item['date'][:4])
-                        except:
-                            pass
-                    
-                    songs.append(song)
-                
-                # Add delay every few items
-                if processed_count % 5 == 0:
-                    time.sleep(0.2)
-                
-                # If we have enough songs, break early to improve performance
-                if len(songs) >= 5:
-                    break
-            
-            print(f"Returning {len(songs)} playable songs out of {processed_count} processed")
-            return songs, total_found
-            
+            # JioSaavn API returns results in data['results']
+            results = data.get('data', {}).get('results', [])
+            for item in results[:per_page]:
+                # Use the best available audio URL or fallback to JioSaavn web link
+                audio_url = None
+                if 'downloadUrl' in item and item['downloadUrl']:
+                    for d in item['downloadUrl']:
+                        if d.get('quality') == '320kbps' and 'url' in d:
+                            audio_url = d['url']
+                            break
+                    if not audio_url:
+                        for d in item['downloadUrl']:
+                            if 'url' in d:
+                                audio_url = d['url']
+                                break
+                elif 'permaUrl' in item:
+                    audio_url = item['permaUrl']
+                # Fallback: use JioSaavn web player link if no direct audio link
+                if not audio_url and 'url' in item:
+                    audio_url = item['url']
+                # Only add if we have a valid url (web or audio)
+                if audio_url:
+                    songs.append({
+                        'id': item.get('id'),
+                        'title': item.get('name'),
+                        'artist': ', '.join([a['name'] for a in item.get('primaryArtists', [])]) if item.get('primaryArtists') else item.get('artist', 'Unknown Artist'),
+                        'album': item.get('album', {}).get('name') if item.get('album') else None,
+                        'year': int(item.get('year')) if item.get('year') and str(item.get('year')).isdigit() else None,
+                        'duration': int(item.get('duration')) if item.get('duration') else None,
+                        'url': audio_url,
+                        'source': 'jiosaavn',
+                        'thumbnail': item.get('image', [None])[-1] if item.get('image') else None
+                    })
+            print(f"Returning {len(songs)} JioSaavn songs")
+            return songs, len(results)
+        else:
+            print(f"JioSaavn API error: {response.text[:200]}")
     except Exception as e:
-        print(f"Error searching Internet Archive: {e}")
-        import traceback
-        traceback.print_exc()
-    
+        print(f"Error searching JioSaavn: {e}")
     return [], 0
 
 def get_popular_songs(limit=10):
@@ -360,34 +253,26 @@ def api_songs():
 
 @app.route('/api/search')
 def api_search():
-    """Search for songs using Internet Archive API"""
+    """Search for songs using static files and JioSaavn API"""
     try:
         query = request.args.get('q', '')
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 20, type=int)
-        
         print(f"Search request: query='{query}', page={page}, per_page={per_page}")
-        
         if not query:
             return jsonify({'error': 'Query parameter required'}), 400
-        
         # Search static songs first
         static_songs = get_static_songs()
         matching_static = [
             song for song in static_songs 
             if query.lower() in song['title'].lower() or query.lower() in song['artist'].lower()
         ]
-        
         print(f"Found {len(matching_static)} matching static songs")
-        
-        # Search API songs
-        api_songs, total_found = search_internet_archive(query, page, per_page)
-        
-        print(f"Found {len(api_songs)} API songs")
-        
+        # Search JioSaavn API
+        jiosaavn_songs, total_found = search_jiosaavn(query, page, per_page)
+        print(f"Found {len(jiosaavn_songs)} JioSaavn songs")
         # Combine results (static songs first)
-        all_results = matching_static + api_songs
-        
+        all_results = matching_static + jiosaavn_songs
         response_data = {
             'songs': all_results,
             'total': len(matching_static) + total_found,
@@ -395,12 +280,10 @@ def api_search():
             'per_page': per_page,
             'query': query,
             'static_matches': len(matching_static),
-            'api_matches': len(api_songs)
+            'api_matches': len(jiosaavn_songs)
         }
-        
         print(f"Returning {len(all_results)} total songs")
         return jsonify(response_data)
-        
     except Exception as e:
         print(f"Error in api_search: {e}")
         import traceback
@@ -470,21 +353,24 @@ def proxy_audio(audio_url):
             # Get content type from original response
             content_type = response.headers.get('content-type', 'audio/mpeg')
             
+            proxy_headers = {
+                'Accept-Ranges': 'bytes',
+                'Cache-Control': 'public, max-age=3600',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET',
+                'Access-Control-Allow-Headers': 'Range',
+            }
+            if response.headers.get('Content-Length'):
+                proxy_headers['Content-Length'] = response.headers['Content-Length']
+            if response.headers.get('Content-Range'):
+                proxy_headers['Content-Range'] = response.headers['Content-Range']
+
             flask_response = app.response_class(
                 generate(),
                 status=response.status_code,
                 mimetype=content_type,
-                headers={
-                    'Accept-Ranges': 'bytes',
-                    'Cache-Control': 'public, max-age=3600',
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Methods': 'GET',
-                    'Access-Control-Allow-Headers': 'Range',
-                    'Content-Length': response.headers.get('Content-Length', ''),
-                    'Content-Range': response.headers.get('Content-Range', '')
-                }
+                headers=proxy_headers
             )
-            
             return flask_response
         else:
             print(f"Failed to fetch audio: {response.status_code}")
@@ -507,12 +393,12 @@ def index():
 def health_check():
     return jsonify({'status': 'healthy', 'service': 'music_player_api'})
 
-# Debug endpoint to test API directly
+# Debug endpoint to test API directly (now uses JioSaavn)
 @app.route('/api/debug/search/<query>')
 def debug_search(query):
-    """Debug endpoint to test search directly"""
+    """Debug endpoint to test search directly (JioSaavn)"""
     try:
-        songs, total = search_internet_archive(query, 1, 5)
+        songs, total = search_jiosaavn(query, 1, 5)
         return jsonify({
             'query': query,
             'songs_found': len(songs),
@@ -537,7 +423,7 @@ def debug_raw(query):
             'output': 'json'
         }
         
-        response = requests.get(SEARCH_URL, params=params, timeout=15)
+        return jsonify({'error': 'This endpoint is deprecated. Internet Archive API is no longer supported.'}), 410
         
         if response.status_code == 200:
             data = response.json()
@@ -562,7 +448,7 @@ def debug_raw(query):
 def debug_files(identifier):
     """Debug endpoint to see what files are in an archive item"""
     try:
-        response = requests.get(f'{METADATA_URL}/{identifier}/files', timeout=10)
+        return jsonify({'error': 'This endpoint is deprecated. Internet Archive API is no longer supported.'}), 410
         
         if response.status_code == 200:
             files_data = response.json()
@@ -583,13 +469,7 @@ def debug_files(identifier):
                 })
                 
                 if is_audio:
-                    direct_url = f"{INTERNET_ARCHIVE_BASE_URL}/download/{identifier}/{urllib.parse.quote(file['name'])}"
-                    proxy_url = f"/proxy/audio/{urllib.parse.quote(direct_url, safe='')}"
-                    audio_files.append({
-                        'name': file.get('name'),
-                        'direct_url': direct_url,
-                        'proxy_url': proxy_url
-                    })
+                    continue
             
             return jsonify({
                 'identifier': identifier,
@@ -597,7 +477,7 @@ def debug_files(identifier):
                 'files_shown': len(file_info),
                 'files': file_info,
                 'audio_files_found': audio_files,
-                'metadata_url': f'{METADATA_URL}/{identifier}/files'
+                'metadata_url': None
             })
         else:
             return jsonify({
@@ -644,7 +524,7 @@ def test_search_strategy(query):
             'output': 'json'
         }
         
-        response = requests.get(SEARCH_URL, params=params, timeout=15)
+        return jsonify({'error': 'This endpoint is deprecated. Internet Archive API is no longer supported.'}), 410
         
         if response.status_code == 200:
             data = response.json()
@@ -656,7 +536,7 @@ def test_search_strategy(query):
             results = []
             for doc in docs:
                 identifier = doc.get('identifier')
-                audio_url = get_song_url_from_archive(identifier) if identifier else None
+                audio_url = None
                 
                 results.append({
                     'identifier': identifier,
@@ -710,12 +590,9 @@ def test_all():
     
     try:
         # Test 3: Search functionality
-        search_results, total = search_internet_archive('music', 1, 3)
         results['search'] = {
-            'status': 'success',
-            'count': len(search_results),
-            'total_found': total,
-            'sample_results': search_results
+            'status': 'skipped',
+            'reason': 'Internet Archive API is no longer supported.'
         }
     except Exception as e:
         results['search'] = {'status': 'error', 'error': str(e)}
@@ -737,7 +614,7 @@ def test_all():
     
     return jsonify({
         'overall_status': 'Backend is working!',
-        'timestamp': time.time(),
+        'timestamp': None,
         'test_results': results
     })
 
