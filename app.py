@@ -6,7 +6,7 @@ import requests
 import time
 import random
 from mutagen.mp3 import MP3
-from mutagen.id3 import ID3, TIT2, TPE1, ID3NoHeaderError
+from mutagen.id3 import ID3, TIT2, TPE1, TALB, TDRC, TYER, ID3NoHeaderError
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
@@ -25,7 +25,7 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def get_static_songs():
-    """Get list of static/local MP3 files"""
+    """Get list of static/local MP3 files with enhanced metadata"""
     songs = []
     songs_path = os.path.join(app.static_folder, 'songs')
 
@@ -33,34 +33,61 @@ def get_static_songs():
         os.makedirs(songs_path)
         return songs
 
+    print(f"Scanning for songs in: {songs_path}")
+    
     for i, filename in enumerate(os.listdir(songs_path), start=1):
         if allowed_file(filename):
             file_path = os.path.join(songs_path, filename)
             title = None
             artist = None
+            album = None
             duration = None
+            year = None
 
             try:
-                # Load MP3 and extract duration
+                # Load MP3 and extract duration and metadata
                 audio = MP3(file_path)
-                duration = audio.info.length
+                duration = round(audio.info.length) if audio.info.length else None
                 
-                # Try to extract ID3 tags (title, artist) - handle files without ID3 tags
+                # Try to extract ID3 tags (title, artist, album, year)
                 try:
                     tags = ID3(file_path)
                     title = tags.get("TIT2")
-                    artist = tags.get("TPE1")
+                    artist = tags.get("TPE1") 
+                    album = tags.get("TALB")
+                    year_tag = tags.get("TDRC") or tags.get("TYER")
+                    
                     title = title.text[0] if title else None
                     artist = artist.text[0] if artist else None
+                    album = album.text[0] if album else None
+                    year = str(year_tag.text[0])[:4] if year_tag else None
+                    year = int(year) if year and year.isdigit() else None
+                    
                 except ID3NoHeaderError:
                     # File doesn't have ID3 tags, that's fine
                     pass
 
             except Exception as e:
-                print(f"Warning: Could not read tags from {filename}: {e}")
+                print(f"Warning: Could not read metadata from {filename}: {e}")
 
-            # Fall back to filename if tags are missing
+            # Fall back to filename parsing if tags are missing
             base_name = os.path.splitext(filename)[0]
+            
+            # Try to parse artist and title from filename patterns
+            if not title or not artist:
+                # Common patterns: "Artist - Title", "Artist_Title", etc.
+                if ' - ' in base_name:
+                    parts = base_name.split(' - ', 1)
+                    if not artist:
+                        artist = parts[0].strip()
+                    if not title:
+                        title = parts[1].strip()
+                elif '_' in base_name and not title:
+                    title = base_name.replace('_', ' ').replace('-', ' ').title()
+                else:
+                    title = base_name.replace('_', ' ').replace('-', ' ').title()
+
+            # Final fallbacks
             pretty_title = title or base_name.replace('_', ' ').replace('-', ' ').title()
             pretty_artist = artist or "Unknown Artist"
 
@@ -70,12 +97,16 @@ def get_static_songs():
                 "id": f"static-{i}",
                 "title": pretty_title,
                 "artist": pretty_artist,
+                "album": album,
+                "year": year,
                 "duration": duration,
                 "url": f"/songs/{encoded_filename}",
                 "source": "static",
+                "filename": filename,
                 "thumbnail": None
             })
 
+    print(f"Found {len(songs)} static songs")
     return songs
 
 def get_song_url_from_archive(identifier):
@@ -709,6 +740,187 @@ def test_all():
         'timestamp': time.time(),
         'test_results': results
     })
+
+# Enhanced API endpoints for production features
+
+@app.route('/api/songs/shuffle')
+def api_songs_shuffle():
+    """Get a shuffled list of all songs"""
+    try:
+        static_songs = get_static_songs()
+        popular_songs = get_popular_songs(10)
+        all_songs = static_songs + popular_songs
+        
+        import random
+        shuffled = all_songs.copy()
+        random.shuffle(shuffled)
+        
+        return jsonify({
+            'songs': shuffled,
+            'total': len(shuffled),
+            'shuffled': True
+        })
+    except Exception as e:
+        print(f"Error in shuffle: {e}")
+        return jsonify({'error': 'Failed to shuffle songs'}), 500
+
+@app.route('/api/songs/<song_id>/info')
+def api_song_info(song_id):
+    """Get detailed information about a specific song"""
+    try:
+        static_songs = get_static_songs()
+        popular_songs = get_popular_songs(20)
+        all_songs = static_songs + popular_songs
+        
+        song = next((s for s in all_songs if s['id'] == song_id), None)
+        
+        if not song:
+            return jsonify({'error': 'Song not found'}), 404
+            
+        # Add extra metadata if it's a static song
+        if song['source'] == 'static':
+            file_path = os.path.join(app.static_folder, 'songs', song.get('filename', ''))
+            if os.path.exists(file_path):
+                try:
+                    audio = MP3(file_path)
+                    song['bitrate'] = audio.info.bitrate if hasattr(audio.info, 'bitrate') else None
+                    song['sample_rate'] = audio.info.sample_rate if hasattr(audio.info, 'sample_rate') else None
+                    song['file_size'] = os.path.getsize(file_path)
+                except:
+                    pass
+        
+        return jsonify(song)
+    except Exception as e:
+        print(f"Error getting song info: {e}")
+        return jsonify({'error': 'Failed to get song info'}), 500
+
+@app.route('/api/songs/by-artist/<artist_name>')
+def api_songs_by_artist(artist_name):
+    """Get all songs by a specific artist"""
+    try:
+        static_songs = get_static_songs()
+        popular_songs = get_popular_songs(20)
+        all_songs = static_songs + popular_songs
+        
+        artist_songs = [
+            song for song in all_songs 
+            if artist_name.lower() in song['artist'].lower()
+        ]
+        
+        return jsonify({
+            'artist': artist_name,
+            'songs': artist_songs,
+            'total': len(artist_songs)
+        })
+    except Exception as e:
+        print(f"Error getting songs by artist: {e}")
+        return jsonify({'error': 'Failed to get songs by artist'}), 500
+
+@app.route('/api/artists')
+def api_artists():
+    """Get list of all artists"""
+    try:
+        static_songs = get_static_songs()
+        popular_songs = get_popular_songs(20)
+        all_songs = static_songs + popular_songs
+        
+        artists = {}
+        for song in all_songs:
+            artist = song['artist']
+            if artist not in artists:
+                artists[artist] = {
+                    'name': artist,
+                    'song_count': 0,
+                    'albums': set()
+                }
+            artists[artist]['song_count'] += 1
+            if song.get('album'):
+                artists[artist]['albums'].add(song['album'])
+        
+        # Convert sets to lists for JSON serialization
+        for artist in artists.values():
+            artist['albums'] = list(artist['albums'])
+            artist['album_count'] = len(artist['albums'])
+        
+        return jsonify({
+            'artists': list(artists.values()),
+            'total': len(artists)
+        })
+    except Exception as e:
+        print(f"Error getting artists: {e}")
+        return jsonify({'error': 'Failed to get artists'}), 500
+
+@app.route('/api/albums')
+def api_albums():
+    """Get list of all albums"""
+    try:
+        static_songs = get_static_songs()
+        popular_songs = get_popular_songs(20)
+        all_songs = static_songs + popular_songs
+        
+        albums = {}
+        for song in all_songs:
+            album = song.get('album') or 'Unknown Album'
+            if album not in albums:
+                albums[album] = {
+                    'name': album,
+                    'artist': song['artist'],
+                    'year': song.get('year'),
+                    'songs': [],
+                    'duration': 0
+                }
+            albums[album]['songs'].append(song)
+            if song.get('duration'):
+                albums[album]['duration'] += song['duration']
+        
+        # Convert to list and add metadata
+        album_list = []
+        for album_name, album_data in albums.items():
+            album_data['song_count'] = len(album_data['songs'])
+            album_data['id'] = f"album-{len(album_list)}"
+            album_list.append(album_data)
+        
+        return jsonify({
+            'albums': album_list,
+            'total': len(album_list)
+        })
+    except Exception as e:
+        print(f"Error getting albums: {e}")
+        return jsonify({'error': 'Failed to get albums'}), 500
+
+@app.route('/api/stats')
+def api_stats():
+    """Get music library statistics"""
+    try:
+        static_songs = get_static_songs()
+        popular_songs = get_popular_songs(20)
+        
+        total_duration = sum(song.get('duration', 0) for song in static_songs if song.get('duration'))
+        
+        artists = set(song['artist'] for song in static_songs)
+        albums = set(song.get('album') for song in static_songs if song.get('album'))
+        
+        years = [song.get('year') for song in static_songs if song.get('year')]
+        year_range = f"{min(years)}-{max(years)}" if years else "Unknown"
+        
+        return jsonify({
+            'total_songs': len(static_songs),
+            'demo_songs': len(popular_songs),
+            'total_artists': len(artists),
+            'total_albums': len(albums),
+            'total_duration': total_duration,
+            'total_duration_formatted': f"{total_duration // 3600}h {(total_duration % 3600) // 60}m",
+            'year_range': year_range,
+            'formats_supported': list(ALLOWED_EXTENSIONS),
+            'library_size_mb': sum(
+                os.path.getsize(os.path.join(app.static_folder, 'songs', song['filename'])) 
+                for song in static_songs 
+                if song.get('filename') and os.path.exists(os.path.join(app.static_folder, 'songs', song['filename']))
+            ) / (1024 * 1024)
+        })
+    except Exception as e:
+        print(f"Error getting stats: {e}")
+        return jsonify({'error': 'Failed to get stats'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5600)
