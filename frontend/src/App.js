@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import './App.css';
 
+// API base URL for backend (set via env in production)
+const API_BASE = process.env.REACT_APP_API_BASE || '';
+
 function useDarkMode() {
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('darkMode');
@@ -52,7 +55,7 @@ function App() {
   const loadRandomSongs = async (reset = true, nextPage = 1) => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`/api/songs?per_page=20&page=${nextPage}`);
+      const response = await axios.get(`${API_BASE}/api/songs?per_page=20&page=${nextPage}`);
       if (reset) {
         setSongs(response.data.songs);
         setMode('local');
@@ -81,7 +84,7 @@ function App() {
   const fetchMoreOnline = async (reset = false, nextPage = 1) => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`/api/search?q=${encodeURIComponent(onlineQuery)}&per_page=20&page=${nextPage}`);
+      const response = await axios.get(`${API_BASE}/api/search?q=${encodeURIComponent(onlineQuery)}&per_page=20&page=${nextPage}`);
       const fetchedSongs = response.data.songs || [];
       if (reset) {
         setSongs(fetchedSongs);
@@ -305,7 +308,7 @@ function App() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await axios.get(`/api/search?q=${encodeURIComponent(searchQuery)}&per_page=20&page=1`);
+      const response = await axios.get(`${API_BASE}/api/search?q=${encodeURIComponent(searchQuery)}&per_page=20&page=1`);
       setSongs(response.data.songs);
       setPage(1);
       setTotalPages(Math.ceil(response.data.total / 20));
@@ -338,7 +341,7 @@ function App() {
     setIsLoading(true);
     try {
       const nextPage = page + 1;
-      const response = await axios.get(`/api/search?q=${encodeURIComponent(searchQuery)}&per_page=20&page=${nextPage}`);
+      const response = await axios.get(`${API_BASE}/api/search?q=${encodeURIComponent(searchQuery)}&per_page=20&page=${nextPage}`);
       setSongs(prev => [...prev, ...response.data.songs]);
       setPage(nextPage);
       setTotalPages(Math.ceil(response.data.total / 20));
