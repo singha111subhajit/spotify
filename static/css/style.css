@@ -1,4 +1,47 @@
+/* Equalizer styles */
+.equalizer {
+  display: flex;
+  align-items: flex-end;
+  height: 20px;
+  width: 28px;
+  margin-right: 8px;
+  gap: 2px;
+}
+.equalizer .bar {
+  width: 4px;
+  background: var(--progress-fill, #1db954);
+  border-radius: 2px;
+  animation: equalize 1s infinite;
+  opacity: 0.85;
+}
+.equalizer .bar1 { animation-delay: 0s; }
+.equalizer .bar2 { animation-delay: 0.2s; }
+.equalizer .bar3 { animation-delay: 0.4s; }
+.equalizer .bar4 { animation-delay: 0.2s; }
+.equalizer .bar5 { animation-delay: 0.1s; }
+
+@keyframes equalize {
+  0% { height: 30%; }
+  20% { height: 100%; }
+  40% { height: 60%; }
+  60% { height: 90%; }
+  80% { height: 40%; }
+  100% { height: 30%; }
+}
+
+@media (max-width: 576px) {
+  .equalizer {
+    height: 14px;
+    width: 18px;
+    margin-right: 4px;
+  }
+  .equalizer .bar {
+    width: 2px;
+    border-radius: 1px;
+  }
+}
 /* Custom styles for the music player */
+
 :root {
     --spotify-green: #1db954;
     --spotify-black: #191414;
@@ -6,15 +49,81 @@
     --spotify-gray: #282828;
     --spotify-light-gray: #b3b3b3;
     --spotify-white: #ffffff;
+
+    /* Light mode defaults */
+    --bg-main: #f7fafc;
+    --bg-card: #fff;
+    --text-main: #191414;
+    --text-secondary: #444;
+    --border-main: #e2e8f0;
+    --input-bg: #f1f5f9;
+    --input-text: #222;
+}
+
+body.dark, .dark {
+    --bg-main: var(--spotify-dark-gray);
+    --bg-card: #23272f;
+    --text-main: #fff;
+    --text-secondary: #b3b3b3;
+    --border-main: #282828;
+    --input-bg: #191414;
+    --input-text: #fff;
+}
+
+/* Ensure all major UI elements use theme variables */
+body, .container, .player-main, .playerCard, .shortcuts, .song-list, .song-item, .songListHeader, .searchInput, .searchButton, .songItemActive {
+    background: var(--bg-main) !important;
+    color: var(--text-main) !important;
+    border-color: var(--border-main) !important;
+    transition: background 0.3s, color 0.3s, border 0.3s;
+}
+
+.playerCard, .shortcuts, .song-list, .song-item, .songListHeader {
+    background: var(--bg-card) !important;
+    color: var(--text-main) !important;
+    border-color: var(--border-main) !important;
+}
+
+.song-item.active, .songItemActive {
+    background: var(--spotify-green) !important;
+    color: #fff !important;
+}
+
+.searchInput {
+    background: var(--input-bg) !important;
+    color: var(--input-text) !important;
+    border: 1px solid var(--border-main) !important;
+}
+
+.searchButton {
+    background: var(--spotify-green) !important;
+    color: #fff !important;
+}
+
+input[type="range"], .volumeSlider {
+    background: var(--border-main) !important;
+}
+
+/* Button hover/focus for dark mode */
+.searchButton:hover, .searchButton:focus {
+    background: #1ed760 !important;
+    color: #191414 !important;
 }
 
 body {
-    background: linear-gradient(135deg, var(--spotify-dark-gray) 0%, var(--spotify-black) 100%);
+    background: var(--bg-main);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0;
     padding: 0;
     min-height: 100vh;
-    padding-bottom: 100px; /* Space for fixed player controls */
+    padding-bottom: 100px;
+    color: var(--text-main);
+    transition: background 0.3s, color 0.3s;
+}
+
+.dark {
+    background: var(--bg-main) !important;
+    color: var(--text-main) !important;
 }
 
 /* Header styling */
@@ -41,15 +150,16 @@ body {
     overflow-y: auto;
 }
 
+
 .song-item {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--bg-card);
+    border: 1px solid var(--border-main);
     border-radius: 8px;
     padding: 12px;
     margin-bottom: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
-    color: var(--spotify-white);
+    color: var(--text-main);
 }
 
 .song-item:hover {
@@ -61,7 +171,7 @@ body {
 .song-item.active {
     background: var(--spotify-green);
     border-color: var(--spotify-green);
-    color: var(--spotify-black);
+    color: #fff;
 }
 
 .song-item .song-title {
@@ -81,9 +191,9 @@ body {
 
 /* Main player area */
 .player-main {
-    background: linear-gradient(135deg, var(--spotify-dark-gray) 0%, var(--spotify-black) 100%);
+    background: var(--bg-main);
     min-height: calc(100vh - 76px);
-    color: var(--spotify-white);
+    color: var(--text-main);
 }
 
 /* Current song display */
@@ -159,14 +269,18 @@ body {
 
 /* Progress bar */
 .progress {
-    background: rgba(255, 255, 255, 0.2) !important;
+    background: var(--progress-bg, #e0e0e0) !important;
     cursor: pointer;
     border-radius: 3px;
+    height: 6px !important;
+    overflow: hidden;
 }
 
 .progress-bar {
-    background: var(--spotify-green) !important;
+    background: var(--progress-fill, #1db954) !important;
     border-radius: 3px;
+    height: 100%;
+    transition: width 0.2s;
 }
 
 .progress:hover .progress-bar {

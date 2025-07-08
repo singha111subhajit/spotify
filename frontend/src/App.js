@@ -9,13 +9,8 @@ function useDarkMode() {
   });
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
-    document.body.classList.remove('dark', 'light');
-    if (darkMode) {
-      document.body.classList.add('dark');
-    } else {
-      document.body.classList.add('light');
-    }
-    console.log('Body class:', document.body.className, 'DarkMode:', darkMode);
+    document.body.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+    console.log('Body data-theme:', document.body.getAttribute('data-theme'), 'DarkMode:', darkMode);
   }, [darkMode]);
   return [darkMode, setDarkMode];
 }
@@ -796,34 +791,20 @@ function App() {
                   <div
                     key={song.id}
                     onClick={() => handleSongSelect(song, index)}
-                    style={{
-                      ...styles.songItem,
-                      ...(currentSong?.id === song.id ? styles.songItemActive : {}),
-                    }}
-                    onMouseEnter={(e) => {
-                      if (currentSong?.id !== song.id) {
-                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (currentSong?.id !== song.id) {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }
-                    }}
+                    className={`song-list-item${currentSong?.id === song.id ? ' active' : ''}`}
                   >
                     <div>
                       <div style={{ 
                         fontWeight: 'bold', 
-                        color: currentSong?.id === song.id ? '#10b981' : 'white',
                         marginBottom: '5px'
                       }}>
                         {index + 1}. {song.title}
                       </div>
-                      <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem' }}>
+                      <div style={{ fontSize: '0.9rem' }}>
                         {song.artist}
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right', fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>
+                    <div style={{ textAlign: 'right', fontSize: '0.8rem' }}>
                       <div>{song.source === 'api' ? '🌐' : '📁'}</div>
                       {song.duration && <div>{formatTime(song.duration)}</div>}
                     </div>

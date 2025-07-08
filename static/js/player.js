@@ -41,6 +41,7 @@ class MusicPlayer {
         // Other elements
         this.songList = document.getElementById('songList');
         this.loadingSpinner = document.getElementById('loadingSpinner');
+        this.equalizer = document.getElementById('equalizer');
     }
     
     bindEvents() {
@@ -268,12 +269,16 @@ class MusicPlayer {
         this.isPlaying = true;
         this.playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
         this.updateActiveItem();
+        // Show and animate equalizer
+        if (this.equalizer) this.equalizer.classList.remove('d-none');
     }
     
     onPause() {
         this.isPlaying = false;
         this.playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
         this.updateActiveItem();
+        // Hide equalizer animation
+        if (this.equalizer) this.equalizer.classList.add('d-none');
     }
     
     onError(e) {
@@ -281,6 +286,8 @@ class MusicPlayer {
         this.showError('Error playing audio. Please try another song.');
         this.isPlaying = false;
         this.playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+        // Hide equalizer animation
+        if (this.equalizer) this.equalizer.classList.add('d-none');
     }
     
     enableControls() {

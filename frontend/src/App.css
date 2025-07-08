@@ -1,3 +1,22 @@
+/* Song list item background for better contrast in light mode */
+body[data-theme='light'] .song-list-item {
+  background: #f7f7f7;
+  color: #222;
+}
+body[data-theme='light'] .song-list-item:hover {
+  background: #e0e0e0;
+}
+body[data-theme='dark'] .song-list-item {
+  background: #232323;
+  color: #f7f7f7;
+}
+body[data-theme='dark'] .song-list-item:hover {
+  background: #333;
+}
+body .song-list-item.active {
+  background: var(--spotify-green) !important;
+  color: #fff !important;
+}
 /* App.css for React music player with modern progress bar and animated equalizer */
 
 :root {
@@ -12,6 +31,18 @@
   --color-progress-bar-dark: #1db954;
   --color-eq-bar: #1db954;
   --color-eq-bar-dark: #1db954;
+
+  /* App-wide custom variables used in JS inline styles */
+  --bg-main: var(--color-bg-light);
+  --text-main: var(--color-text-light);
+  --text-secondary: var(--color-secondary);
+  --bg-card: #fff;
+  --border-main: #e0e0e0;
+  --input-bg: #f7f7f7;
+  --input-text: #222;
+  --spotify-green: #1db954;
+  --spotify-gray: #e9e9e9;
+
 }
 
 body[data-theme='dark'] {
@@ -19,6 +50,16 @@ body[data-theme='dark'] {
   --color-text: var(--color-text-dark);
   --color-progress-bg: #333;
   --color-progress-bar: var(--color-progress-bar-dark);
+
+  --bg-main: var(--color-bg-dark);
+  --text-main: var(--color-text-dark);
+  --text-secondary: #b3b3b3;
+  --bg-card: #232323;
+  --border-main: #333;
+  --input-bg: #232323;
+  --input-text: #f7f7f7;
+  --spotify-green: #1db954;
+  --spotify-gray: #232323;
   --color-eq-bar: var(--color-eq-bar-dark);
 }
 
@@ -27,6 +68,16 @@ body[data-theme='light'] {
   --color-text: var(--color-text-light);
   --color-progress-bg: #e0e0e0;
   --color-progress-bar: #1db954;
+
+  --bg-main: var(--color-bg-light);
+  --text-main: var(--color-text-light);
+  --text-secondary: var(--color-secondary);
+  --bg-card: #fff;
+  --border-main: #e0e0e0;
+  --input-bg: #f7f7f7;
+  --input-text: #222;
+  --spotify-green: #1db954;
+  --spotify-gray: #e9e9e9;
   --color-eq-bar: #1db954;
 }
 
