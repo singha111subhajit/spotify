@@ -1,4 +1,3 @@
-
 from flask import Flask, render_template, jsonify, send_from_directory, request
 from flask_cors import CORS
 import os
@@ -383,10 +382,20 @@ def proxy_audio(audio_url):
         traceback.print_exc()
         return jsonify({'error': 'Failed to proxy audio'}), 500
 
-@app.route('/')
-def index():
-    """Serve the main page - will serve React app in production"""
-    return render_template('index.html')
+# Serve React static files
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_react(path):
+    build_dir = os.path.join(os.path.dirname(__file__), 'frontend', 'build')
+    if path != "" and os.path.exists(os.path.join(build_dir, path)):
+        return send_from_directory(build_dir, path)
+    else:
+        return send_from_directory(build_dir, 'index.html')
+
+@app.route('/static/<path:filename>')
+def serve_react_static(filename):
+    build_static_dir = os.path.join(os.path.dirname(__file__), 'frontend', 'build', 'static')
+    return send_from_directory(build_static_dir, filename)
 
 # Health check endpoint
 @app.route('/api/health')
