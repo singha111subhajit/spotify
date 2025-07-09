@@ -49,6 +49,11 @@ function App() {
   const [repeatMode, setRepeatMode] = useState('none'); // 'none', 'one', 'all'
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
+  const suggestionTimeout = useRef(null);
+  const searchInputRef = useRef(null);
   
   const audioRef = useRef(null);
 
@@ -430,6 +435,37 @@ function App() {
     }
   };
 
+  // Debounced fetch for suggestions
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    // Only fetch if input is not empty and not loading
+    if (isLoading) return;
+    // Debounce
+    if (suggestionTimeout.current) clearTimeout(suggestionTimeout.current);
+    suggestionTimeout.current = setTimeout(async () => {
+      try {
+        const resp = await axios.get(`${API_BASE}/api/search?q=${encodeURIComponent(searchQuery)}&per_page=5&page=1`);
+        setSuggestions(resp.data.songs || []);
+        setShowSuggestions(true);
+      } catch (e) {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 300); // 300ms debounce
+    return () => {
+      if (suggestionTimeout.current) clearTimeout(suggestionTimeout.current);
+    };
+  }, [searchQuery]);
+
+  // Hide suggestions on blur (with delay to allow click)
+  const handleInputBlur = () => {
+    setTimeout(() => setShowSuggestions(false), 150);
+  };
+
   // Utility functions
   const formatTime = (seconds) => {
     if (!seconds || isNaN(seconds)) return '0:00';
@@ -732,15 +768,92 @@ function App() {
             gap: '10px', 
             width: '100%', 
             maxWidth: '500px' // Responsive form width
-          }}>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search for music..."
-              style={styles.searchInput}
-              disabled={isLoading}
-            />
+          }} autoComplete="off">
+            <div style={{ position: 'relative', width: '100%' }}>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowSuggestions(!!e.target.value);
+                  setActiveSuggestion(-1);
+                }}
+                placeholder="Search for music..."
+                style={{
+                  ...styles.searchInput,
+                  paddingLeft: '38px',
+                  background: 'var(--bg-card)',
+                  color: 'var(--text-main)',
+                  border: 'none',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
+                }}
+                disabled={isLoading}
+                ref={searchInputRef}
+                onFocus={() => searchQuery && setShowSuggestions(true)}
+                onBlur={handleInputBlur}
+              />
+              {/* Search icon inside input */}
+              <span style={{
+                position: 'absolute',
+                left: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--spotify-green)',
+                fontSize: 20,
+                pointerEvents: 'none',
+                opacity: 0.85
+              }}>🔍</span>
+              {/* Suggestions dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: '110%',
+                  left: 0,
+                  right: 0,
+                  background: '#181818',
+                  border: '1px solid #282828',
+                  borderTop: 'none',
+                  zIndex: 10,
+                  maxHeight: 260,
+                  overflowY: 'auto',
+                  borderRadius: '0 0 16px 16px',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+                  padding: '4px 0',
+                  animation: 'fadeIn 0.2s',
+                }}>
+                  {suggestions.map((s, i) => (
+                    <div
+                      key={s.id || s.url || i}
+                      style={{
+                        padding: '12px 20px',
+                        cursor: 'pointer',
+                        background: i === activeSuggestion ? 'var(--spotify-green)' : 'transparent',
+                        color: i === activeSuggestion ? '#fff' : '#fff',
+                        fontWeight: i === activeSuggestion ? 600 : 400,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        borderBottom: i !== suggestions.length - 1 ? '1px solid #232323' : 'none',
+                        transition: 'background 0.15s',
+                        borderRadius: i === suggestions.length - 1 ? '0 0 16px 16px' : 0
+                      }}
+                      onMouseDown={() => {
+                        setSearchQuery(''); // Clear input so dropdown does not reappear
+                        setShowSuggestions(false);
+                        setActiveSuggestion(-1);
+                        setSuggestions([]); // Hide dropdown until new input
+                        setCurrentSong(s);
+                        setCurrentIndex(0);
+                        setIsPlaying(true);
+                      }}
+                      onMouseEnter={() => setActiveSuggestion(i)}
+                    >
+                      <div style={{ fontWeight: 500, fontSize: '1.05em' }}>{s.title}</div>
+                      <div style={{ fontSize: '0.92em', color: i === activeSuggestion ? '#e0ffe0' : '#b3b3b3', marginTop: 2 }}>{s.artist || ''}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               type="submit"
               style={styles.searchButton}
