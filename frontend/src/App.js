@@ -680,7 +680,7 @@ function App() {
             </button>
           </div>
           <p style={{ ...styles.subtitle, color: 'var(--text-secondary)' }}>
-            Production-ready music player with all modern features
+            Play, search & enjoy your favorite tracks in one click
           </p>
         </header>
 
@@ -954,7 +954,7 @@ function App() {
           opacity: 0.8
         }}>
           <p>
-            🎵 Built with React + Flask • Enhanced with modern UI/UX • JioSaavn Integration
+            🎵 M.S Music 🎵
           </p>
         </footer>
       </div>
