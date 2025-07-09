@@ -127,13 +127,22 @@ function App() {
 
   useEffect(() => {
     // On mount, try to load random online songs first
+    const shuffleArray = (array) => {
+      const arr = array.slice();
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
     const loadInitialSongs = async () => {
       setIsLoading(true);
       try {
         // Try fetching random online songs (e.g., bollywood as default)
         const response = await axios.get(`${API_BASE}/api/search?q=bollywood&per_page=20&page=1`);
-        const fetchedSongs = response.data.songs || [];
+        let fetchedSongs = response.data.songs || [];
         if (fetchedSongs.length > 0) {
+          fetchedSongs = shuffleArray(fetchedSongs); // Shuffle for randomness
           setSongs(fetchedSongs);
           setMode('online');
           setOnlinePage(1);

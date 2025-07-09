@@ -355,15 +355,17 @@ def api_songs():
         print(f"Found {len(popular_songs)} popular songs")
         
         all_songs = static_songs + popular_songs
-        
+        # Shuffle the song list for randomness on every request
+        random.shuffle(all_songs)
+
         # Pagination
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
-        
+
         start_idx = (page - 1) * per_page
         end_idx = start_idx + per_page
         paginated_songs = all_songs[start_idx:end_idx]
-        
+
         return jsonify({
             'songs': paginated_songs,
             'total': len(all_songs),
