@@ -1,29 +1,12 @@
-/* Song list item background for better contrast in light mode */
-body[data-theme='light'] .song-list-item {
-  background: #f7f7f7;
-  color: #222;
-}
-body[data-theme='light'] .song-list-item:hover {
-  background: #e0e0e0;
-}
-body[data-theme='dark'] .song-list-item {
-  background: #232323;
-  color: #f7f7f7;
-}
-body[data-theme='dark'] .song-list-item:hover {
-  background: #333;
-}
-body .song-list-item.active {
-  background: var(--spotify-green) !important;
-  color: #fff !important;
-}
-/* App.css for React music player with modern progress bar and animated equalizer */
+/* App.css for React music player with modern progress bar, animated equalizer, and three themes */
 
 :root {
   --color-bg-light: #f7f7f7;
   --color-bg-dark: #181818;
+  --color-bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   --color-text-light: #222;
   --color-text-dark: #f7f7f7;
+  --color-text-gradient: #ffffff;
   --color-primary: #1db954;
   --color-secondary: #535353;
   --color-progress-bg: #e0e0e0;
@@ -42,9 +25,9 @@ body .song-list-item.active {
   --input-text: #222;
   --spotify-green: #1db954;
   --spotify-gray: #e9e9e9;
-
 }
 
+/* Dark Theme */
 body[data-theme='dark'] {
   --color-bg: var(--color-bg-dark);
   --color-text: var(--color-text-dark);
@@ -63,6 +46,7 @@ body[data-theme='dark'] {
   --color-eq-bar: var(--color-eq-bar-dark);
 }
 
+/* Light Theme */
 body[data-theme='light'] {
   --color-bg: var(--color-bg-light);
   --color-text: var(--color-text-light);
@@ -81,21 +65,79 @@ body[data-theme='light'] {
   --color-eq-bar: #1db954;
 }
 
+/* NEW: Gradient Theme */
+body[data-theme='gradient'] {
+  --color-bg: var(--color-bg-gradient);
+  --color-text: var(--color-text-gradient);
+  --color-progress-bg: rgba(255,255,255,0.2);
+  --color-progress-bar: #10b981;
+
+  --bg-main: var(--color-bg-gradient);
+  --text-main: var(--color-text-gradient);
+  --text-secondary: rgba(255,255,255,0.8);
+  --bg-card: rgba(255,255,255,0.1);
+  --border-main: rgba(255,255,255,0.2);
+  --input-bg: rgba(255,255,255,0.15);
+  --input-text: #ffffff;
+  --spotify-green: #10b981;
+  --spotify-gray: rgba(255,255,255,0.2);
+  --color-eq-bar: #10b981;
+}
+
+/* Song list item background for better contrast in different themes */
+body[data-theme='light'] .song-list-item {
+  background: #f7f7f7;
+  color: #222;
+}
+body[data-theme='light'] .song-list-item:hover {
+  background: #e0e0e0;
+}
+
+body[data-theme='dark'] .song-list-item {
+  background: #232323;
+  color: #f7f7f7;
+}
+body[data-theme='dark'] .song-list-item:hover {
+  background: #333;
+}
+
+body[data-theme='gradient'] .song-list-item {
+  background: rgba(255,255,255,0.1);
+  color: #ffffff;
+  backdrop-filter: blur(10px);
+}
+body[data-theme='gradient'] .song-list-item:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+body .song-list-item.active {
+  background: var(--spotify-green) !important;
+  color: #fff !important;
+}
+
+/* Player card styling */
 .player-card {
   background: var(--color-bg);
   color: var(--color-text);
   border-radius: 1.5rem;
-  box-shadow: 0 2px 16px rgba(0,0,0,0.08);
-  padding: 2rem 1.5rem 1.5rem 1.5rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+  padding: clamp(1.5rem, 4vw, 2rem) clamp(1rem, 3vw, 1.5rem) clamp(1rem, 3vw, 1.5rem) clamp(1rem, 3vw, 1.5rem);
   max-width: 420px;
   margin: 2rem auto;
   position: relative;
 }
 
+/* Gradient theme specific enhancements */
+body[data-theme='gradient'] .player-card {
+  backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+/* Progress container styling */
 .progress-container {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: clamp(0.5rem, 2vw, 1rem);
   margin: 1.5rem 0 0.5rem 0;
 }
 
@@ -106,6 +148,7 @@ body[data-theme='light'] {
   border-radius: 4px;
   overflow: hidden;
   position: relative;
+  cursor: pointer;
 }
 
 .progress-bar {
@@ -115,18 +158,19 @@ body[data-theme='light'] {
   transition: width 0.2s cubic-bezier(.4,0,.2,1);
 }
 
+/* Equalizer styling */
 .equalizer {
   display: flex;
   align-items: flex-end;
-  height: 24px;
-  width: 32px;
+  height: clamp(18px, 5vw, 24px);
+  width: clamp(24px, 6vw, 32px);
   margin-left: 0.5rem;
   margin-right: 0.5rem;
 }
 
 .eq-bar {
-  width: 4px;
-  margin: 0 2px;
+  width: clamp(3px, 1vw, 4px);
+  margin: 0 clamp(1px, 0.5vw, 2px);
   background: var(--color-eq-bar);
   border-radius: 2px;
   animation: eq-bounce 1s infinite;
@@ -140,29 +184,176 @@ body[data-theme='light'] {
 .eq-bar:nth-child(5) { animation-delay: 0s; }
 
 @keyframes eq-bounce {
-  0%, 100% { height: 8px; }
-  20% { height: 24px; }
-  40% { height: 12px; }
-  60% { height: 20px; }
-  80% { height: 10px; }
+  0%, 100% { height: clamp(6px, 2vw, 8px); }
+  20% { height: clamp(18px, 5vw, 24px); }
+  40% { height: clamp(10px, 3vw, 12px); }
+  60% { height: clamp(15px, 4vw, 20px); }
+  80% { height: clamp(8px, 2.5vw, 10px); }
 }
 
-@media (max-width: 600px) {
+/* Mobile responsiveness */
+@media (max-width: 768px) {
   .player-card {
-    max-width: 98vw;
-    padding: 1rem 0.5rem 1rem 0.5rem;
+    max-width: 95vw;
+    margin: 1rem auto;
+    padding: clamp(1rem, 4vw, 1.5rem) clamp(0.8rem, 3vw, 1rem) clamp(0.8rem, 3vw, 1rem) clamp(0.8rem, 3vw, 1rem);
   }
+  
   .progress-container {
     gap: 0.5rem;
+    margin: 1rem 0 0.5rem 0;
   }
+  
   .equalizer {
-    width: 24px;
-    height: 18px;
+    width: 20px;
+    height: 16px;
   }
+  
   .eq-bar {
-    width: 3px;
+    width: 2px;
     margin: 0 1px;
+  }
+  
+  @keyframes eq-bounce {
+    0%, 100% { height: 4px; }
+    20% { height: 16px; }
+    40% { height: 8px; }
+    60% { height: 12px; }
+    80% { height: 6px; }
   }
 }
 
-/* Add any other custom styles for the player UI below */
+@media (max-width: 480px) {
+  .player-card {
+    max-width: 98vw;
+    padding: 1rem 0.8rem;
+    margin: 0.5rem auto;
+  }
+  
+  .progress-container {
+    gap: 0.3rem;
+  }
+  
+  .equalizer {
+    width: 18px;
+    height: 14px;
+  }
+}
+
+/* Enhanced input styling for all themes */
+input[type="text"], input[type="range"] {
+  transition: all 0.3s ease;
+}
+
+input[type="text"]:focus {
+  box-shadow: 0 0 0 2px var(--spotify-green);
+  outline: none;
+}
+
+/* Custom scrollbar for song list */
+.song-list-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.song-list-container::-webkit-scrollbar-track {
+  background: var(--bg-card);
+}
+
+.song-list-container::-webkit-scrollbar-thumb {
+  background: var(--border-main);
+  border-radius: 4px;
+}
+
+.song-list-container::-webkit-scrollbar-thumb:hover {
+  background: var(--spotify-green);
+}
+
+/* Button hover effects */
+button {
+  transition: all 0.3s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Enhanced gradient theme backdrop effects */
+body[data-theme='gradient'] {
+  backdrop-filter: blur(20px);
+}
+
+body[data-theme='gradient'] .player-card {
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+body[data-theme='gradient'] input {
+  backdrop-filter: blur(10px);
+}
+
+/* Album art image styling */
+.album-art-image {
+  border-radius: 15px;
+  object-fit: cover;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+/* Loading animation */
+@keyframes loading-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.loading {
+  animation: loading-pulse 1.5s ease-in-out infinite;
+}
+
+/* Improved accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .eq-bar {
+    animation: none;
+  }
+  
+  button {
+    transition: none;
+  }
+  
+  .progress-bar {
+    transition: none;
+  }
+}
+
+/* Focus indicators for keyboard navigation */
+button:focus-visible {
+  outline: 2px solid var(--spotify-green);
+  outline-offset: 2px;
+}
+
+input:focus-visible {
+  outline: 2px solid var(--spotify-green);
+  outline-offset: 2px;
+}
+
+/* High contrast support */
+@media (prefers-contrast: high) {
+  body[data-theme='gradient'] {
+    --bg-card: rgba(0,0,0,0.8);
+    --text-main: #ffffff;
+    --border-main: rgba(255,255,255,0.5);
+  }
+}
+
+/* Print styles */
+@media print {
+  .equalizer,
+  button,
+  input[type="range"] {
+    display: none;
+  }
+}

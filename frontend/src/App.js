@@ -6,20 +6,22 @@ import './App.css';
 const API_BASE = process.env.REACT_APP_API_BASE || '';
 
 function useDarkMode() {
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : true;
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    return saved ? saved : 'dark';
   });
+  
   useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
-    document.body.setAttribute('data-theme', darkMode ? 'dark' : 'light');
-    console.log('Body data-theme:', document.body.getAttribute('data-theme'), 'DarkMode:', darkMode);
-  }, [darkMode]);
-  return [darkMode, setDarkMode];
+    localStorage.setItem('theme', theme);
+    document.body.setAttribute('data-theme', theme);
+    console.log('Body data-theme:', document.body.getAttribute('data-theme'), 'Theme:', theme);
+  }, [theme]);
+  
+  return [theme, setTheme];
 }
 
 function App() {
-  const [darkMode, setDarkMode] = useDarkMode();
+  const [theme, setTheme] = useDarkMode();
   // Core state
   const [songs, setSongs] = useState([]);
   const [currentSong, setCurrentSong] = useState(null);
@@ -67,7 +69,9 @@ function App() {
       setPage(response.data.page);
       setTotalPages(response.data.total_pages);
       setHasMore(response.data.page < response.data.total_pages);
-      if (response.data.songs.length > 0 && reset) {
+      
+      // Only set current song if there's no current song playing
+      if (response.data.songs.length > 0 && reset && !currentSong) {
         setCurrentSong(response.data.songs[0]);
         setCurrentIndex(0);
       }
@@ -102,7 +106,9 @@ function App() {
         setOnlineHasMore(true);
         setHasMore(true);
       }
-      if (fetchedSongs.length > 0 && reset) {
+      
+      // Only set current song if there's no current song playing
+      if (fetchedSongs.length > 0 && reset && !currentSong) {
         setCurrentSong(fetchedSongs[0]);
         setCurrentIndex(0);
       }
@@ -196,6 +202,18 @@ function App() {
     });
   }, []);
 
+  // Cycle through themes
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => {
+      switch (prev) {
+        case 'dark': return 'light';
+        case 'light': return 'gradient';
+        case 'gradient': return 'dark';
+        default: return 'dark';
+      }
+    });
+  }, [setTheme]);
+
   // --- useEffect hooks ---
   // Auto-play when song changes
   useEffect(() => {
@@ -207,7 +225,7 @@ function App() {
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.catch(error => {
-            console.error('Playback failed:', error);
+            console.error('Playbook failed:', error);
             setIsPlaying(false);
           });
         }
@@ -297,11 +315,11 @@ function App() {
   // Player controls
   // ...existing code...
 
-  // Search handler
+  // Search handler - FIXED: Don't change current song when searching
   const handleSearch = async (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) {
-      // If search is empty, show random songs
+      // If search is empty, show random songs but keep current song playing
       loadRandomSongs(true, 1);
       return;
     }
@@ -313,9 +331,18 @@ function App() {
       setPage(1);
       setTotalPages(Math.ceil(response.data.total / 20));
       setHasMore(response.data.songs.length > 0 && response.data.total > response.data.songs.length);
-      if (response.data.songs.length > 0) {
+      
+      // FIXED: Only set current song if there's no song currently playing
+      if (response.data.songs.length > 0 && !currentSong) {
         setCurrentSong(response.data.songs[0]);
         setCurrentIndex(0);
+      }
+      // Update current index if current song is in new results
+      if (currentSong) {
+        const newIndex = response.data.songs.findIndex(song => song.id === currentSong.id);
+        if (newIndex !== -1) {
+          setCurrentIndex(newIndex);
+        }
       }
     } catch (error) {
       console.error('Search error:', error);
@@ -325,13 +352,7 @@ function App() {
     }
   };
 
-  // If search box is cleared, instantly show random songs
-  useEffect(() => {
-    if (searchQuery === '') {
-      loadRandomSongs(true, 1);
-    }
-    // eslint-disable-next-line
-  }, [searchQuery]);
+  // REMOVED: Auto-load random songs when search is cleared to prevent current song changing
 
   // Infinite scroll is disabled. Only the button loads more songs.
 
@@ -378,15 +399,44 @@ function App() {
     return duration ? (currentTime / duration) * 100 : 0;
   };
 
-  // Styles
-  const styles = {
-    container: {
+  // Get theme label for button
+  const getThemeLabel = () => {
+    switch (theme) {
+      case 'dark': return '🌙 Dark';
+      case 'light': return '☀️ Light';
+      case 'gradient': return '🌈 Gradient';
+      default: return '🌙 Dark';
+    }
+  };
+
+  // Get background style with song image
+  const getContainerStyle = () => {
+    const baseStyle = {
       minHeight: '100vh',
       background: 'var(--bg-main)',
       color: 'var(--text-main)',
       fontFamily: 'system-ui, -apple-system, sans-serif',
-      transition: 'background 0.3s, color 0.3s'
-    },
+      transition: 'background 0.3s, color 0.3s',
+      position: 'relative'
+    };
+
+    // Add background image if song has thumbnail
+    if (currentSong && currentSong.thumbnail && isPlaying) {
+      return {
+        ...baseStyle,
+        backgroundImage: `linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.8)), url(${currentSong.thumbnail})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed'
+      };
+    }
+
+    return baseStyle;
+  };
+
+  // Styles with mobile responsiveness
+  const styles = {
+    container: getContainerStyle(),
     content: {
       maxWidth: '1200px',
       margin: '0 auto',
@@ -397,7 +447,7 @@ function App() {
       marginBottom: '30px'
     },
     title: {
-      fontSize: '3rem',
+      fontSize: 'clamp(1.8rem, 5vw, 3rem)', // Responsive font size
       margin: '0',
       color: 'var(--text-main)',
       textShadow: '0 2px 4px rgba(0,0,0,0.3)'
@@ -410,7 +460,8 @@ function App() {
       display: 'flex',
       justifyContent: 'center',
       marginBottom: '30px',
-      gap: '10px'
+      gap: '10px',
+      padding: '0 10px' // Mobile padding
     },
     searchInput: {
       padding: '12px 16px',
@@ -419,7 +470,9 @@ function App() {
       borderRadius: '25px',
       backgroundColor: 'var(--input-bg)',
       color: 'var(--input-text)',
-      width: '400px',
+      width: '100%', // FIXED: Responsive width
+      maxWidth: '400px', // Maximum width for desktop
+      minWidth: '200px', // Minimum width
       outline: 'none',
       transition: 'background 0.3s, color 0.3s'
     },
@@ -431,30 +484,35 @@ function App() {
       border: 'none',
       borderRadius: '25px',
       cursor: 'pointer',
-      transition: 'all 0.3s ease'
+      transition: 'all 0.3s ease',
+      whiteSpace: 'nowrap' // Prevent text wrapping
     },
     playerCard: {
       backgroundColor: 'var(--bg-card)',
       borderRadius: '20px',
-      padding: '30px',
+      padding: 'clamp(20px, 4vw, 30px)', // Responsive padding
       marginBottom: '30px',
       border: '1px solid var(--border-main)',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+      boxShadow: '0 8px 32px rgba(0,0,0,0.3)', // Enhanced shadow for background images
+      backdropFilter: currentSong && currentSong.thumbnail ? 'blur(10px)' : 'none'
     },
     albumArt: {
-      width: '120px',
-      height: '120px',
+      width: 'clamp(100px, 20vw, 120px)', // Responsive size
+      height: 'clamp(100px, 20vw, 120px)',
       borderRadius: '15px',
-      background: 'var(--spotify-gray)',
+      background: currentSong && currentSong.thumbnail 
+        ? `url(${currentSong.thumbnail}) center/cover` 
+        : 'var(--spotify-gray)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       fontSize: '3rem',
       margin: '0 auto 20px',
-      color: 'var(--spotify-green)'
+      color: currentSong && currentSong.thumbnail ? 'transparent' : 'var(--spotify-green)',
+      boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
     },
     songTitle: {
-      fontSize: '1.5rem',
+      fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', // Responsive font size
       fontWeight: 'bold',
       margin: '0 0 5px 0',
       textAlign: 'center',
@@ -463,7 +521,8 @@ function App() {
     artistName: {
       color: 'var(--text-secondary)',
       textAlign: 'center',
-      marginBottom: '20px'
+      marginBottom: '20px',
+      fontSize: 'clamp(0.9rem, 3vw, 1rem)' // Responsive font size
     },
     progressContainer: {
       marginBottom: '20px'
@@ -485,19 +544,20 @@ function App() {
     timeDisplay: {
       display: 'flex',
       justifyContent: 'space-between',
-      fontSize: '0.9rem',
+      fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)', // Responsive font size
       color: 'var(--text-secondary)'
     },
     controls: {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: '15px',
-      marginBottom: '20px'
+      gap: 'clamp(10px, 3vw, 15px)', // Responsive gap
+      marginBottom: '20px',
+      flexWrap: 'wrap' // Allow wrapping on very small screens
     },
     controlButton: {
-      width: '50px',
-      height: '50px',
+      width: 'clamp(45px, 10vw, 50px)', // Responsive size
+      height: 'clamp(45px, 10vw, 50px)',
       borderRadius: '50%',
       border: 'none',
       backgroundColor: 'var(--bg-card)',
@@ -506,24 +566,25 @@ function App() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontSize: '1.2rem',
+      fontSize: 'clamp(1rem, 2.5vw, 1.2rem)', // Responsive font size
       transition: 'all 0.3s ease'
     },
     playButton: {
-      width: '70px',
-      height: '70px',
+      width: 'clamp(60px, 15vw, 70px)', // Responsive size
+      height: 'clamp(60px, 15vw, 70px)',
       backgroundColor: 'var(--spotify-green)',
-      fontSize: '1.8rem',
+      fontSize: 'clamp(1.5rem, 4vw, 1.8rem)', // Responsive font size
       color: '#fff'
     },
     volumeContainer: {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: '10px'
+      gap: '10px',
+      flexWrap: 'wrap' // Allow wrapping on small screens
     },
     volumeSlider: {
-      width: '100px',
+      width: 'clamp(80px, 20vw, 100px)', // Responsive width
       height: '4px',
       borderRadius: '2px',
       background: 'var(--border-main)',
@@ -534,15 +595,19 @@ function App() {
       backgroundColor: 'var(--bg-card)',
       borderRadius: '20px',
       overflow: 'hidden',
-      border: '1px solid var(--border-main)'
+      border: '1px solid var(--border-main)',
+      maxHeight: '60vh', // INCREASED: More space for song list
+      display: 'flex',
+      flexDirection: 'column'
     },
     songListHeader: {
       padding: '20px',
       backgroundColor: 'var(--bg-main)',
-      borderBottom: '1px solid var(--border-main)'
+      borderBottom: '1px solid var(--border-main)',
+      flexShrink: 0 // Don't shrink
     },
     songItem: {
-      padding: '15px 20px',
+      padding: 'clamp(12px, 3vw, 15px) clamp(15px, 4vw, 20px)', // Responsive padding
       borderBottom: '1px solid var(--border-main)',
       cursor: 'pointer',
       display: 'flex',
@@ -555,14 +620,6 @@ function App() {
     songItemActive: {
       backgroundColor: 'var(--spotify-green)',
       color: '#fff'
-    },
-    shortcuts: {
-      marginTop: '20px',
-      padding: '20px',
-      backgroundColor: 'var(--bg-card)',
-      borderRadius: '15px',
-      fontSize: '0.9rem',
-      color: 'var(--text-secondary)'
     }
   };
 
@@ -595,25 +652,31 @@ function App() {
       <div style={styles.content}>
         {/* Header */}
         <header style={styles.header}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            gap: 'clamp(10px, 3vw, 16px)', // Responsive gap
+            flexWrap: 'wrap' // Allow wrapping
+          }}>
             <h1 style={styles.title}>🎵 Ultimate Music Player</h1>
             <button
-              onClick={() => setDarkMode((d) => !d)}
+              onClick={toggleTheme}
               style={{
-                marginLeft: 24,
                 border: 'none',
                 borderRadius: 20,
-                padding: '8px 18px',
+                padding: 'clamp(6px, 2vw, 8px) clamp(12px, 3vw, 18px)', // Responsive padding
                 background: 'var(--bg-card)',
                 color: 'var(--text-main)',
                 fontWeight: 600,
-                fontSize: 16,
+                fontSize: 'clamp(12px, 3vw, 16px)', // Responsive font size
                 cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                whiteSpace: 'nowrap'
               }}
-              title="Toggle dark mode"
+              title="Toggle theme"
             >
-              {darkMode ? '🌙 Dark' : '☀️ Light'}
+              {getThemeLabel()}
             </button>
           </div>
           <p style={{ ...styles.subtitle, color: 'var(--text-secondary)' }}>
@@ -623,7 +686,12 @@ function App() {
 
         {/* Search */}
         <div style={styles.searchContainer}>
-          <form onSubmit={handleSearch} style={{ display: 'flex', gap: '10px' }}>
+          <form onSubmit={handleSearch} style={{ 
+            display: 'flex', 
+            gap: '10px', 
+            width: '100%', 
+            maxWidth: '500px' // Responsive form width
+          }}>
             <input
               type="text"
               value={searchQuery}
@@ -646,15 +714,19 @@ function App() {
         <div style={styles.playerCard}>
           {currentSong ? (
             <>
-              {/* Album Art */}
+              {/* Album Art with image */}
               <div style={styles.albumArt}>
-                🎵
+                {!(currentSong.thumbnail) && '🎵'}
               </div>
 
-              {/* Song Info */}
-              <h3 style={styles.songTitle}>{currentSong.title}</h3>
-              <p style={styles.artistName}>{currentSong.artist}</p>
-
+              {/* Song Info with better metadata display */}
+              <h3 style={styles.songTitle}>{currentSong.title || 'Unknown Title'}</h3>
+              <p style={styles.artistName}>
+                {currentSong.source === 'jiosaavn' 
+                  ? (currentSong.artist && currentSong.artist !== 'Unknown Artist' ? currentSong.artist : 'Various Artists')
+                  : (currentSong.artist || 'Unknown Artist')
+                }
+              </p>
 
               {/* Progress Bar + Equalizer */}
               <div className="progress-container" onClick={handleSeek} style={{ cursor: 'pointer', width: '100%' }}>
@@ -673,7 +745,13 @@ function App() {
                     style={{ width: `${getProgressPercent()}%` }}
                   />
                 </div>
-                <div className="time-display" style={{ minWidth: 80, display: 'flex', justifyContent: 'space-between', fontSize: 14, marginLeft: 8 }}>
+                <div className="time-display" style={{ 
+                  minWidth: 'clamp(60px, 15vw, 80px)', // Responsive width
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  fontSize: 'clamp(12px, 3vw, 14px)', // Responsive font size
+                  marginLeft: 'clamp(4px, 2vw, 8px)' // Responsive margin
+                }}>
                   <span>{formatTime(currentTime)}</span>
                   <span>{formatTime(duration)}</span>
                 </div>
@@ -685,7 +763,7 @@ function App() {
                   onClick={toggleShuffle}
                   style={{
                     ...styles.controlButton,
-                    backgroundColor: isShuffled ? '#10b981' : 'rgba(255,255,255,0.2)'
+                    backgroundColor: isShuffled ? '#10b981' : styles.controlButton.backgroundColor
                   }}
                   title="Shuffle (S)"
                 >
@@ -721,7 +799,7 @@ function App() {
                   onClick={toggleRepeat}
                   style={{
                     ...styles.controlButton,
-                    backgroundColor: repeatMode !== 'none' ? '#10b981' : 'rgba(255,255,255,0.2)'
+                    backgroundColor: repeatMode !== 'none' ? '#10b981' : styles.controlButton.backgroundColor
                   }}
                   title="Repeat (R)"
                 >
@@ -748,15 +826,21 @@ function App() {
                   style={styles.volumeSlider}
                   title="Volume (↑↓)"
                 />
-                <span style={{ fontSize: '0.9rem', minWidth: '40px' }}>
+                <span style={{ fontSize: 'clamp(0.8rem, 2vw, 0.9rem)', minWidth: '40px' }}>
                   {Math.round((isMuted ? 0 : volume) * 100)}%
                 </span>
               </div>
 
               {/* Source Info */}
-              <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginTop: '15px' }}>
-                Source: {currentSong.source === 'api' ? '🌐 Internet Archive' : '📁 Local File'}
-                {currentSong.album && ` • ${currentSong.album}`}
+              <div style={{ 
+                fontSize: 'clamp(0.7rem, 2vw, 0.8rem)', // Responsive font size
+                color: 'var(--text-secondary)', 
+                textAlign: 'center', 
+                marginTop: '15px',
+                opacity: 0.8
+              }}>
+                Source: {currentSong.source === 'jiosaavn' ? '🎵 JioSaavn' : currentSong.source === 'api' ? '🌐 Internet Archive' : '📁 Local File'}
+                {currentSong.album && currentSong.album !== 'Unknown Album' && ` • ${currentSong.album}`}
                 {currentSong.year && ` • ${currentSong.year}`}
               </div>
 
@@ -777,13 +861,13 @@ function App() {
           )}
         </div>
 
-        {/* Song List */}
+        {/* Song List - ENLARGED by removing keyboard shortcuts */}
         <div style={styles.songList}>
           <div style={styles.songListHeader}>
-            <h2 style={{ margin: '0' }}>Songs ({songs.length})</h2>
+            <h2 style={{ margin: '0', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)' }}>Songs ({songs.length})</h2>
           </div>
           
-          <div style={{ maxHeight: '400px', overflowY: 'auto' }} ref={songListRef}>
+          <div style={{ flex: 1, overflowY: 'auto' }} ref={songListRef}>
             {songs.length === 0 && !isLoading ? (
               <div style={{ padding: '40px', textAlign: 'center' }}>
                 <p>No songs found</p>
@@ -795,20 +879,25 @@ function App() {
                     key={song.id}
                     onClick={() => handleSongSelect(song, index)}
                     className={`song-list-item${currentSong?.id === song.id ? ' active' : ''}`}
+                    style={styles.songItem}
                   >
                     <div>
                       <div style={{ 
                         fontWeight: 'bold', 
-                        marginBottom: '5px'
+                        marginBottom: '5px',
+                        fontSize: 'clamp(0.9rem, 3vw, 1rem)' // Responsive font size
                       }}>
-                        {index + 1}. {song.title}
+                        {index + 1}. {song.title || 'Unknown Title'}
                       </div>
-                      <div style={{ fontSize: '0.9rem' }}>
-                        {song.artist}
+                      <div style={{ fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)' }}>
+                        {song.source === 'jiosaavn' 
+                          ? (song.artist && song.artist !== 'Unknown Artist' ? song.artist : 'Various Artists')
+                          : (song.artist || 'Unknown Artist')
+                        }
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right', fontSize: '0.8rem' }}>
-                      <div>{song.source === 'api' ? '🌐' : '📁'}</div>
+                    <div style={{ textAlign: 'right', fontSize: 'clamp(0.7rem, 2vw, 0.8rem)' }}>
+                      <div>{song.source === 'jiosaavn' ? '🎵' : song.source === 'api' ? '🌐' : '📁'}</div>
                       {song.duration && <div>{formatTime(song.duration)}</div>}
                     </div>
                   </div>
@@ -823,16 +912,16 @@ function App() {
           </div>
           {/* See more songs button always below the list */}
           {canShowSeeMore && !isLoading && (
-            <div style={{ padding: '10px', textAlign: 'center' }}>
+            <div style={{ padding: '10px', textAlign: 'center', flexShrink: 0 }}>
               <button
                 style={{
-                  padding: '10px 28px',
+                  padding: 'clamp(8px, 2vw, 10px) clamp(20px, 5vw, 28px)', // Responsive padding
                   borderRadius: 20,
                   border: 'none',
                   background: 'var(--spotify-green)',
                   color: '#fff',
                   fontWeight: 600,
-                  fontSize: 16,
+                  fontSize: 'clamp(14px, 3vw, 16px)', // Responsive font size
                   cursor: 'pointer',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
                 }}
@@ -854,23 +943,18 @@ function App() {
           )}
         </div>
 
-        {/* Keyboard Shortcuts */}
-        <div style={styles.shortcuts}>
-          <h3 style={{ margin: '0 0 10px 0', color: 'rgba(255,255,255,0.9)' }}>⌨️ Keyboard Shortcuts</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
-            <span><strong>Space:</strong> Play/Pause</span>
-            <span><strong>←/→:</strong> Previous/Next</span>
-            <span><strong>↑/↓:</strong> Volume Up/Down</span>
-            <span><strong>M:</strong> Mute/Unmute</span>
-            <span><strong>S:</strong> Shuffle</span>
-            <span><strong>R:</strong> Repeat Mode</span>
-          </div>
-        </div>
+        {/* REMOVED: Keyboard Shortcuts section to save space */}
 
         {/* Footer */}
-        <footer style={{ marginTop: '30px', textAlign: 'center', fontSize: '0.9rem', color: 'rgba(255,255,255,0.6)' }}>
+        <footer style={{ 
+          marginTop: '30px', 
+          textAlign: 'center', 
+          fontSize: 'clamp(0.8rem, 2vw, 0.9rem)', // Responsive font size
+          color: 'var(--text-secondary)',
+          opacity: 0.8
+        }}>
           <p>
-            🎵 Built with React + Flask • Enhanced with modern UI/UX
+            🎵 Built with React + Flask • Enhanced with modern UI/UX • JioSaavn Integration
           </p>
         </footer>
       </div>
