@@ -1031,19 +1031,24 @@ function App() {
                     className={`song-list-item${currentSong?.id === song.id ? ' active' : ''}`}
                     style={styles.songItem}
                   >
-                    <div>
-                      <div style={{ 
-                        fontWeight: 'bold', 
-                        marginBottom: '5px',
-                        fontSize: 'clamp(0.9rem, 3vw, 1rem)' // Responsive font size
-                      }}>
-                        {index + 1}. {song.title || 'Unknown Title'}
-                      </div>
-                      <div style={{ fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)' }}>
-                        {song.source === 'jiosaavn' 
-                          ? (song.artist && song.artist !== 'Unknown Artist' ? song.artist : 'Various Artists')
-                          : (song.artist || 'Unknown Artist')
-                        }
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      {/* Show thumbnail if available, else music note */}
+                      {song.thumbnail ? (
+                        <img src={song.thumbnail} alt="thumb" style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'cover', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }} />
+                      ) : (
+                        <span style={{ width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, background: '#232323', borderRadius: 8, color: '#1db954' }}>🎵</span>
+                      )}
+                      <div>
+                        <div style={{ 
+                          fontWeight: 'bold', 
+                          marginBottom: '5px',
+                          fontSize: 'clamp(0.9rem, 3vw, 1rem)'
+                        }}>
+                          {song.title || 'Unknown Title'}
+                        </div>
+                        <div style={{ fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)' }}>
+                          {song.artist || 'Unknown Artist'}
+                        </div>
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', fontSize: 'clamp(0.7rem, 2vw, 0.8rem)' }}>
