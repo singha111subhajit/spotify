@@ -121,8 +121,37 @@ function App() {
   };
 
   useEffect(() => {
-    // On mount, load random songs
-    loadRandomSongs();
+    // On mount, try to load random online songs first
+    const loadInitialSongs = async () => {
+      setIsLoading(true);
+      try {
+        // Try fetching random online songs (e.g., bollywood as default)
+        const response = await axios.get(`${API_BASE}/api/search?q=bollywood&per_page=20&page=1`);
+        const fetchedSongs = response.data.songs || [];
+        if (fetchedSongs.length > 0) {
+          setSongs(fetchedSongs);
+          setMode('online');
+          setOnlinePage(1);
+          setOnlineHasMore(true);
+          setPage(1);
+          setTotalPages(Math.ceil((response.data.total || 20) / 20));
+          setHasMore(fetchedSongs.length > 0 && (response.data.total > fetchedSongs.length));
+          if (!currentSong) {
+            setCurrentSong(fetchedSongs[0]);
+            setCurrentIndex(0);
+          }
+        } else {
+          // Fallback to static songs if API returns nothing
+          await loadRandomSongs(true, 1);
+        }
+      } catch (err) {
+        // Fallback to static songs if API fails
+        await loadRandomSongs(true, 1);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadInitialSongs();
   }, []);
 
   // --- Player controls (move these above useEffect hooks) ---
@@ -156,6 +185,7 @@ function App() {
     }
     setCurrentIndex(nextIndex);
     setCurrentSong(songs[nextIndex]);
+    setIsPlaying(true); // Ensure next song auto-plays
   }, [currentIndex, songs, isShuffled, repeatMode]);
 
   const handlePrevious = useCallback(() => {
@@ -215,23 +245,36 @@ function App() {
   }, [setTheme]);
 
   // --- useEffect hooks ---
-  // Auto-play when song changes
+  // Auto-play when song changes (only reload audio if song changes)
   useEffect(() => {
     if (currentSong && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = currentSong.url;
       audioRef.current.load();
       setCurrentTime(0); // Reset progress
       setDuration(0);   // Reset duration
       if (isPlaying) {
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.error('Playbook failed:', error);
-            setIsPlaying(false);
-          });
-        }
+        audioRef.current.play().catch(error => {
+          console.error('Playback failed:', error);
+          setIsPlaying(false);
+        });
       }
     }
-  }, [currentSong, isPlaying]);
+    // eslint-disable-next-line
+  }, [currentSong]);
+
+  // Play/pause effect (do not reload audio)
+  useEffect(() => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.play().catch(error => {
+        console.error('Playback failed:', error);
+        setIsPlaying(false);
+      });
+    } else {
+      audioRef.current.pause();
+    }
+  }, [isPlaying]);
 
   // Audio event handlers
   useEffect(() => {
@@ -642,10 +685,8 @@ function App() {
     );
   }
 
-  // See more button should show in online mode as long as we have any songs and haven't hit 0 on last fetch
-  const canShowSeeMore =
-    (mode === 'local' && (hasMore || (!hasMore && songs.length > 0))) ||
-    (mode === 'online' && songs.length > 0 && hasMore);
+  // See more button should always show if there are any songs
+  const canShowSeeMore = songs.length > 0;
 
   return (
     <div style={styles.container}>
@@ -721,12 +762,7 @@ function App() {
 
               {/* Song Info with better metadata display */}
               <h3 style={styles.songTitle}>{currentSong.title || 'Unknown Title'}</h3>
-              <p style={styles.artistName}>
-                {currentSong.source === 'jiosaavn' 
-                  ? (currentSong.artist && currentSong.artist !== 'Unknown Artist' ? currentSong.artist : 'Various Artists')
-                  : (currentSong.artist || 'Unknown Artist')
-                }
-              </p>
+              <div style={styles.artistName}>{currentSong.artist || 'Unknown Artist'}</div>
 
               {/* Progress Bar + Equalizer */}
               <div className="progress-container" onClick={handleSeek} style={{ cursor: 'pointer', width: '100%' }}>
@@ -845,6 +881,7 @@ function App() {
               </div>
 
               <audio
+                key={currentSong?.id || currentSong?.url}
                 ref={audioRef}
                 src={currentSong.url}
                 preload="metadata"
