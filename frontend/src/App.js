@@ -549,7 +549,9 @@ function App() {
       justifyContent: 'center',
       marginBottom: '30px',
       gap: '10px',
-      padding: '0 10px' // Mobile padding
+      padding: '0 10px', // Mobile padding
+      position: 'relative',
+      zIndex: 20
     },
     searchInput: {
       padding: '12px 16px',
@@ -778,7 +780,7 @@ function App() {
             width: '100%', 
             maxWidth: '500px' // Responsive form width
           }} autoComplete="off">
-            <div style={{ position: 'relative', width: '100%' }}>
+            <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
               <input
                 type="text"
                 value={searchQuery}
@@ -794,7 +796,10 @@ function App() {
                   background: 'var(--bg-card)',
                   color: 'var(--text-main)',
                   border: 'none',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                  marginRight: 0,
+                  flex: 1,
+                  minWidth: 0
                 }}
                 disabled={isLoading}
                 ref={searchInputRef}
@@ -997,7 +1002,7 @@ function App() {
                 marginTop: '15px',
                 opacity: 0.8
               }}>
-                Source: {currentSong.source === 'jiosaavn' ? '🎵 JioSaavn' : currentSong.source === 'api' ? '🌐 Internet Archive' : '📁 Local File'}
+                Source: {currentSong.source === 'jiosaavn' ? '🎵 ' : currentSong.source === 'api' ? '🌐 Internet Archive' : '📁 Local File'}
                 {currentSong.album && currentSong.album !== 'Unknown Album' && ` • ${currentSong.album}`}
                 {currentSong.year && ` • ${currentSong.year}`}
               </div>

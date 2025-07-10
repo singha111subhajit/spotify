@@ -24,4 +24,5 @@ ENV FLASK_ENV=production
 
 EXPOSE 5600
 
-CMD ["python", "app.py"]
+# Use gunicorn for production WSGI serving
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5600", "app:app"]

@@ -150,7 +150,7 @@ def search_jiosaavn(query, page=1, per_page=20):
                 # Enhanced artist extraction with multiple fallbacks
                 artist = None
                 # DEBUG: print raw item fields for troubleshooting
-                print('JioSaavn item:', {k: v for k, v in item.items() if k in ['primaryArtists', 'artists', 'artist', 'artistMap']})
+                # print('JioSaavn item:', {k: v for k, v in item.items() if k in ['primaryArtists', 'artists', 'artist', 'artistMap']})
                 # Prefer artists.primary as list of dicts
                 if item.get('artists') and isinstance(item['artists'], dict) and 'primary' in item['artists']:
                     primary_artists = item['artists']['primary']
@@ -294,7 +294,7 @@ def search_jiosaavn(query, page=1, per_page=20):
                         'thumbnail': thumbnail
                     }
                     songs.append(song_data)
-                    print(f"Added JioSaavn song: {title} by {artist}")
+                    # print(f"Added JioSaavn song: {title} by {artist}")
             
             print(f"Returning {len(songs)} JioSaavn songs")
             return songs, len(results)
@@ -943,5 +943,8 @@ def api_stats():
         print(f"Error getting stats: {e}")
         return jsonify({'error': 'Failed to get stats'}), 500
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5600)
+
+# --- Production Note ---
+# For production, run this app with a WSGI server such as gunicorn:
+#   gunicorn -w 4 -b 0.0.0.0:5600 app:app
+# Do NOT use Flask's built-in server in production.
