@@ -541,8 +541,7 @@ function App() {
     }
   };
 
-<<<<<<< HEAD
-=======
+
   // Modified fetchMoreRandom to switch to online mode if no more local songs
   const fetchMoreRandom = async () => {
     if (!hasMore || isLoading) return;
