@@ -144,19 +144,84 @@ function App() {
     setIsPlaying(true);
   }, []);
 
-  const handleNext = useCallback(() => {
+  // Enhanced fetchMoreOnline with better error handling
+  const fetchMoreOnlineEnhanced = useCallback(async (reset = false, nextPage = 1) => {
+    if (isLoading) return;
+    
+    try {
+      await fetchMoreOnline(reset, nextPage);
+    } catch (error) {
+      console.error('Error loading online songs:', error);
+      setOnlineHasMore(false);
+      setHasMore(false);
+    }
+  }, [isLoading, fetchMoreOnline]);
+
+  // Simple function to load more songs automatically
+  const loadMoreSongsAutomatically = useCallback(async () => {
+    if (isLoading) return;
+    
+    console.log('Auto-loading more songs for continuous playback...');
+    
+    if (mode === 'local' && hasMore) {
+      // Load more local songs
+      const nextPage = page + 1;
+      if (nextPage <= totalPages) {
+        await loadRandomSongs(false, nextPage);
+      } else {
+        // Switch to online mode
+        setMode('online');
+        await fetchMoreOnline(true, 1);
+      }
+    } else if (mode === 'local' && !hasMore) {
+      // Switch to online mode for continuous playback
+      setMode('online');
+      await fetchMoreOnline(true, 1);
+    } else if (mode === 'online' && onlineHasMore) {
+      // Load more online songs
+      await fetchMoreOnline(false, onlinePage + 1);
+    }
+  }, [isLoading, mode, hasMore, page, totalPages, onlineHasMore, onlinePage, loadRandomSongs, fetchMoreOnline]);
+
+  const handleNext = useCallback(async () => {
     if (songs.length === 0) return;
+    
     let nextIndex;
     if (repeatMode === 'one') {
       nextIndex = currentIndex;
     } else if (isShuffled) {
       nextIndex = Math.floor(Math.random() * songs.length);
     } else {
-      nextIndex = (currentIndex + 1) % songs.length;
+      nextIndex = currentIndex + 1;
+      
+      // If we've reached the end of current songs, try to load more
+      if (nextIndex >= songs.length) {
+        if ((hasMore || onlineHasMore) && !isLoading) {
+          console.log('Reached end of songs, loading more automatically...');
+          try {
+            await loadMoreSongsAutomatically();
+            // After loading, check if we have more songs
+            if (songs.length > currentIndex + 1) {
+              nextIndex = currentIndex + 1;
+            } else {
+              // If still no more songs, wrap to beginning
+              nextIndex = 0;
+            }
+          } catch (error) {
+            console.error('Failed to load more songs:', error);
+            // Wrap to beginning if loading fails
+            nextIndex = 0;
+          }
+        } else {
+          // No more songs available, wrap to beginning
+          nextIndex = 0;
+        }
+      }
     }
+    
     setCurrentIndex(nextIndex);
     setCurrentSong(songs[nextIndex]);
-  }, [currentIndex, songs, isShuffled, repeatMode]);
+  }, [currentIndex, songs, isShuffled, repeatMode, hasMore, onlineHasMore, isLoading, loadMoreSongsAutomatically]);
 
   const handlePrevious = useCallback(() => {
     if (songs.length === 0) return;
@@ -265,6 +330,21 @@ function App() {
     };
   }, [currentSong, handleNext]);
 
+  // Auto-preload songs when getting close to the end for seamless playback
+  useEffect(() => {
+    // Only preload if we're not in shuffle mode and not currently loading
+    if (!isShuffled && !isLoading && (hasMore || onlineHasMore) && songs.length > 0) {
+      // Check if current song is close to the end of the list
+      const songsRemaining = songs.length - currentIndex;
+      
+      // Preload when 3 or fewer songs remaining
+      if (songsRemaining <= 3) {
+        console.log(`Preloading more songs: ${songsRemaining} songs remaining`);
+        loadMoreSongsAutomatically();
+      }
+    }
+  }, [currentIndex, songs.length, isShuffled, isLoading, hasMore, onlineHasMore, loadMoreSongsAutomatically]);
+
   // Volume control
   useEffect(() => {
     if (audioRef.current) {
@@ -371,19 +451,6 @@ function App() {
       setHasMore(false);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  // Modified fetchMoreRandom to switch to online mode if no more local songs
-  const fetchMoreRandom = async () => {
-    if (!hasMore || isLoading) return;
-    const nextPage = page + 1;
-    if (nextPage > totalPages) {
-      // Switch to online mode
-      setMode('online');
-      fetchMoreOnline(true, 1);
-    } else {
-      await loadRandomSongs(false, nextPage);
     }
   };
 
@@ -927,13 +994,14 @@ function App() {
                 }}
                 onClick={() => {
                   if (mode === 'local' && hasMore) {
-                    fetchMoreRandom();
+                    // This button now only loads more local songs
+                    loadMoreSongsAutomatically();
                   } else if (mode === 'local' && !hasMore) {
                     // Switch to online mode
                     setMode('online');
-                    fetchMoreOnline(true, 1);
+                    fetchMoreOnlineEnhanced(true, 1);
                   } else {
-                    fetchMoreOnline(false, onlinePage + 1);
+                    fetchMoreOnlineEnhanced(false, onlinePage + 1);
                   }
                 }}
               >
