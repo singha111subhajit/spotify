@@ -149,38 +149,35 @@ def search_jiosaavn(query, page=1, per_page=20):
                 
                 # Enhanced artist extraction with multiple fallbacks
                 artist = None
-                if item.get('primaryArtists') and isinstance(item.get('primaryArtists'), list):
-                    # Extract from primaryArtists array
-                    artist_names = []
-                    for artist_obj in item.get('primaryArtists', []):
-                        if isinstance(artist_obj, dict) and artist_obj.get('name'):
-                            artist_names.append(artist_obj['name'])
-                        elif isinstance(artist_obj, str):
-                            artist_names.append(artist_obj)
-                    if artist_names:
-                        artist = ', '.join(artist_names)
-                
-                # Fallback to other artist fields
-                if not artist:
-                    if item.get('artists') and isinstance(item.get('artists'), list):
-                        artist_names = []
-                        for artist_obj in item.get('artists', []):
-                            if isinstance(artist_obj, dict) and artist_obj.get('name'):
-                                artist_names.append(artist_obj['name'])
-                            elif isinstance(artist_obj, str):
-                                artist_names.append(artist_obj)
+                # DEBUG: print raw item fields for troubleshooting
+                # print('JioSaavn item:', {k: v for k, v in item.items() if k in ['primaryArtists', 'artists', 'artist', 'artistMap']})
+                # Prefer artists.primary as list of dicts
+                if item.get('artists') and isinstance(item['artists'], dict) and 'primary' in item['artists']:
+                    primary_artists = item['artists']['primary']
+                    if isinstance(primary_artists, list) and primary_artists:
+                        artist_names = [a['name'] for a in primary_artists if isinstance(a, dict) and a.get('name')]
                         if artist_names:
                             artist = ', '.join(artist_names)
-                
-                # Final fallbacks for artist
+                # Fallback to primaryArtists as string
+                if not artist and item.get('primaryArtists'):
+                    if isinstance(item['primaryArtists'], str):
+                        artist = item['primaryArtists']
+                # Fallback to artists as string
+                if not artist and item.get('artists'):
+                    if isinstance(item['artists'], str):
+                        artist = item['artists']
+                # Fallback to other artist fields
                 if not artist:
-                    artist = item.get('artist') or item.get('artistMap', {}).get('primary_artists', [{}])[0].get('name') or 'Various Artists'
-                
+                    artist = item.get('artist')
+                if not artist and item.get('artistMap') and item['artistMap'].get('primary_artists'):
+                    pa = item['artistMap']['primary_artists']
+                    if isinstance(pa, list) and pa and isinstance(pa[0], dict):
+                        artist = pa[0].get('name')
                 # Clean up artist name
                 if isinstance(artist, str):
                     artist = artist.strip()
                     if not artist or artist.lower() in ['unknown', 'unknown artist', '']:
-                        artist = 'Various Artists'
+                        artist = 'Unknown Artist'
                 
                 # Enhanced album extraction
                 album = None
@@ -297,7 +294,7 @@ def search_jiosaavn(query, page=1, per_page=20):
                         'thumbnail': thumbnail
                     }
                     songs.append(song_data)
-                    print(f"Added JioSaavn song: {title} by {artist}")
+                    # print(f"Added JioSaavn song: {title} by {artist}")
             
             print(f"Returning {len(songs)} JioSaavn songs")
             return songs, len(results)
@@ -358,15 +355,17 @@ def api_songs():
         print(f"Found {len(popular_songs)} popular songs")
         
         all_songs = static_songs + popular_songs
-        
+        # Shuffle the song list for randomness on every request
+        random.shuffle(all_songs)
+
         # Pagination
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
-        
+
         start_idx = (page - 1) * per_page
         end_idx = start_idx + per_page
         paginated_songs = all_songs[start_idx:end_idx]
-        
+
         return jsonify({
             'songs': paginated_songs,
             'total': len(all_songs),
@@ -944,5 +943,8 @@ def api_stats():
         print(f"Error getting stats: {e}")
         return jsonify({'error': 'Failed to get stats'}), 500
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5600)
+
+# --- Production Note ---
+# For production, run this app with a WSGI server such as gunicorn:
+#   gunicorn -w 4 -b 0.0.0.0:5600 app:app
+# Do NOT use Flask's built-in server in production.

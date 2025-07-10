@@ -49,6 +49,11 @@ function App() {
   const [repeatMode, setRepeatMode] = useState('none'); // 'none', 'one', 'all'
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
+  const suggestionTimeout = useRef(null);
+  const searchInputRef = useRef(null);
   
   const audioRef = useRef(null);
 
@@ -121,8 +126,46 @@ function App() {
   };
 
   useEffect(() => {
-    // On mount, load random songs
-    loadRandomSongs();
+    // On mount, try to load random online songs first
+    const shuffleArray = (array) => {
+      const arr = array.slice();
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
+    const loadInitialSongs = async () => {
+      setIsLoading(true);
+      try {
+        // Try fetching random online songs (e.g., bollywood as default)
+        const response = await axios.get(`${API_BASE}/api/search?q=bollywood&per_page=20&page=1`);
+        let fetchedSongs = response.data.songs || [];
+        if (fetchedSongs.length > 0) {
+          fetchedSongs = shuffleArray(fetchedSongs); // Shuffle for randomness
+          setSongs(fetchedSongs);
+          setMode('online');
+          setOnlinePage(1);
+          setOnlineHasMore(true);
+          setPage(1);
+          setTotalPages(Math.ceil((response.data.total || 20) / 20));
+          setHasMore(fetchedSongs.length > 0 && (response.data.total > fetchedSongs.length));
+          if (!currentSong) {
+            setCurrentSong(fetchedSongs[0]);
+            setCurrentIndex(0);
+          }
+        } else {
+          // Fallback to static songs if API returns nothing
+          await loadRandomSongs(true, 1);
+        }
+      } catch (err) {
+        // Fallback to static songs if API fails
+        await loadRandomSongs(true, 1);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadInitialSongs();
   }, []);
 
   // --- Player controls (move these above useEffect hooks) ---
@@ -221,6 +264,7 @@ function App() {
     
     setCurrentIndex(nextIndex);
     setCurrentSong(songs[nextIndex]);
+    setIsPlaying(true); // Ensure next song auto-plays
   }, [currentIndex, songs, isShuffled, repeatMode, hasMore, onlineHasMore, isLoading, loadMoreSongsAutomatically]);
 
   const handlePrevious = useCallback(() => {
@@ -280,23 +324,36 @@ function App() {
   }, [setTheme]);
 
   // --- useEffect hooks ---
-  // Auto-play when song changes
+  // Auto-play when song changes (only reload audio if song changes)
   useEffect(() => {
     if (currentSong && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = currentSong.url;
       audioRef.current.load();
       setCurrentTime(0); // Reset progress
       setDuration(0);   // Reset duration
       if (isPlaying) {
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.error('Playbook failed:', error);
-            setIsPlaying(false);
-          });
-        }
+        audioRef.current.play().catch(error => {
+          console.error('Playback failed:', error);
+          setIsPlaying(false);
+        });
       }
     }
-  }, [currentSong, isPlaying]);
+    // eslint-disable-next-line
+  }, [currentSong]);
+
+  // Play/pause effect (do not reload audio)
+  useEffect(() => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.play().catch(error => {
+        console.error('Playback failed:', error);
+        setIsPlaying(false);
+      });
+    } else {
+      audioRef.current.pause();
+    }
+  }, [isPlaying]);
 
   // Audio event handlers
   useEffect(() => {
@@ -304,10 +361,40 @@ function App() {
     if (!audio) return;
     const updateTime = () => {
       setCurrentTime(audio.currentTime);
-      console.log('audio.currentTime:', audio.currentTime);
+      // console.log('audio.currentTime:', audio.currentTime);
     };
     const updateDuration = () => setDuration(audio.duration);
-    const onEnded = () => handleNext();
+    const onEnded = async () => {
+      // Only advance if not at the end of the list
+      if (repeatMode === 'one') {
+        audio.currentTime = 0;
+        audio.play();
+      } else if (isShuffled) {
+        handleNext();
+      } else if (currentIndex + 1 < songs.length) {
+        handleNext();
+      } else if (hasMore) {
+        // At end, but more songs can be loaded: load more and continue
+        setIsLoading(true);
+        let prevSongsLen = songs.length;
+        if (mode === 'local') {
+          await fetchMoreRandom();
+        } else if (mode === 'online') {
+          await fetchMoreOnline(false, onlinePage + 1);
+        }
+        setIsLoading(false);
+        // If new songs loaded, play the next one
+        if (songs.length > prevSongsLen) {
+          setCurrentIndex(prevSongsLen);
+          setCurrentSong(songs[prevSongsLen]);
+          setIsPlaying(true);
+        } else {
+          setIsPlaying(false); // No more songs loaded
+        }
+      } else {
+        setIsPlaying(false); // Stop playback at end
+      }
+    };
     const onPlay = () => {
       setIsPlaying(true);
       setCurrentTime(audio.currentTime);
@@ -328,7 +415,7 @@ function App() {
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('seeked', onSeeked);
     };
-  }, [currentSong, handleNext]);
+  }, [currentSong, handleNext, repeatMode, isShuffled, currentIndex, songs.length]);
 
   // Auto-preload songs when getting close to the end for seamless playback
   useEffect(() => {
@@ -454,6 +541,52 @@ function App() {
     }
   };
 
+<<<<<<< HEAD
+=======
+  // Modified fetchMoreRandom to switch to online mode if no more local songs
+  const fetchMoreRandom = async () => {
+    if (!hasMore || isLoading) return;
+    const nextPage = page + 1;
+    if (nextPage > totalPages) {
+      // Switch to online mode
+      setMode('online');
+      fetchMoreOnline(true, 1);
+    } else {
+      await loadRandomSongs(false, nextPage);
+    }
+  };
+
+  // Debounced fetch for suggestions
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    // Only fetch if input is not empty and not loading
+    if (isLoading) return;
+    // Debounce
+    if (suggestionTimeout.current) clearTimeout(suggestionTimeout.current);
+    suggestionTimeout.current = setTimeout(async () => {
+      try {
+        const resp = await axios.get(`${API_BASE}/api/search?q=${encodeURIComponent(searchQuery)}&per_page=5&page=1`);
+        setSuggestions(resp.data.songs || []);
+        setShowSuggestions(true);
+      } catch (e) {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 300); // 300ms debounce
+    return () => {
+      if (suggestionTimeout.current) clearTimeout(suggestionTimeout.current);
+    };
+  }, [searchQuery]);
+
+  // Hide suggestions on blur (with delay to allow click)
+  const handleInputBlur = () => {
+    setTimeout(() => setShowSuggestions(false), 150);
+  };
+
   // Utility functions
   const formatTime = (seconds) => {
     if (!seconds || isNaN(seconds)) return '0:00';
@@ -528,7 +661,9 @@ function App() {
       justifyContent: 'center',
       marginBottom: '30px',
       gap: '10px',
-      padding: '0 10px' // Mobile padding
+      padding: '0 10px', // Mobile padding
+      position: 'relative',
+      zIndex: 20
     },
     searchInput: {
       padding: '12px 16px',
@@ -709,10 +844,8 @@ function App() {
     );
   }
 
-  // See more button should show in online mode as long as we have any songs and haven't hit 0 on last fetch
-  const canShowSeeMore =
-    (mode === 'local' && (hasMore || (!hasMore && songs.length > 0))) ||
-    (mode === 'online' && songs.length > 0 && hasMore);
+  // See more button should always show if there are any songs
+  const canShowSeeMore = songs.length > 0;
 
   return (
     <div style={styles.container}>
@@ -747,7 +880,7 @@ function App() {
             </button>
           </div>
           <p style={{ ...styles.subtitle, color: 'var(--text-secondary)' }}>
-            Production-ready music player with all modern features
+            Play, search & enjoy your favorite tracks in one click
           </p>
         </header>
 
@@ -758,15 +891,95 @@ function App() {
             gap: '10px', 
             width: '100%', 
             maxWidth: '500px' // Responsive form width
-          }}>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search for music..."
-              style={styles.searchInput}
-              disabled={isLoading}
-            />
+          }} autoComplete="off">
+            <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowSuggestions(!!e.target.value);
+                  setActiveSuggestion(-1);
+                }}
+                placeholder="Search for music..."
+                style={{
+                  ...styles.searchInput,
+                  paddingLeft: '38px',
+                  background: 'var(--bg-card)',
+                  color: 'var(--text-main)',
+                  border: 'none',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                  marginRight: 0,
+                  flex: 1,
+                  minWidth: 0
+                }}
+                disabled={isLoading}
+                ref={searchInputRef}
+                onFocus={() => searchQuery && setShowSuggestions(true)}
+                onBlur={handleInputBlur}
+              />
+              {/* Search icon inside input */}
+              <span style={{
+                position: 'absolute',
+                left: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--spotify-green)',
+                fontSize: 20,
+                pointerEvents: 'none',
+                opacity: 0.85
+              }}>🔍</span>
+              {/* Suggestions dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: '110%',
+                  left: 0,
+                  right: 0,
+                  background: '#181818',
+                  border: '1px solid #282828',
+                  borderTop: 'none',
+                  zIndex: 10,
+                  maxHeight: 260,
+                  overflowY: 'auto',
+                  borderRadius: '0 0 16px 16px',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+                  padding: '4px 0',
+                  animation: 'fadeIn 0.2s',
+                }}>
+                  {suggestions.map((s, i) => (
+                    <div
+                      key={s.id || s.url || i}
+                      style={{
+                        padding: '12px 20px',
+                        cursor: 'pointer',
+                        background: i === activeSuggestion ? 'var(--spotify-green)' : 'transparent',
+                        color: i === activeSuggestion ? '#fff' : '#fff',
+                        fontWeight: i === activeSuggestion ? 600 : 400,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        borderBottom: i !== suggestions.length - 1 ? '1px solid #232323' : 'none',
+                        transition: 'background 0.15s',
+                        borderRadius: i === suggestions.length - 1 ? '0 0 16px 16px' : 0
+                      }}
+                      onMouseDown={() => {
+                        setSearchQuery(''); // Clear input so dropdown does not reappear
+                        setShowSuggestions(false);
+                        setActiveSuggestion(-1);
+                        setSuggestions([]); // Hide dropdown until new input
+                        setCurrentSong(s);
+                        setCurrentIndex(0);
+                        setIsPlaying(true);
+                      }}
+                      onMouseEnter={() => setActiveSuggestion(i)}
+                    >
+                      <div style={{ fontWeight: 500, fontSize: '1.05em' }}>{s.title}</div>
+                      <div style={{ fontSize: '0.92em', color: i === activeSuggestion ? '#e0ffe0' : '#b3b3b3', marginTop: 2 }}>{s.artist || ''}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               type="submit"
               style={styles.searchButton}
@@ -788,12 +1001,7 @@ function App() {
 
               {/* Song Info with better metadata display */}
               <h3 style={styles.songTitle}>{currentSong.title || 'Unknown Title'}</h3>
-              <p style={styles.artistName}>
-                {currentSong.source === 'jiosaavn' 
-                  ? (currentSong.artist && currentSong.artist !== 'Unknown Artist' ? currentSong.artist : 'Various Artists')
-                  : (currentSong.artist || 'Unknown Artist')
-                }
-              </p>
+              <div style={styles.artistName}>{currentSong.artist || 'Unknown Artist'}</div>
 
               {/* Progress Bar + Equalizer */}
               <div className="progress-container" onClick={handleSeek} style={{ cursor: 'pointer', width: '100%' }}>
@@ -906,12 +1114,13 @@ function App() {
                 marginTop: '15px',
                 opacity: 0.8
               }}>
-                Source: {currentSong.source === 'jiosaavn' ? '🎵 JioSaavn' : currentSong.source === 'api' ? '🌐 Internet Archive' : '📁 Local File'}
+                Source: {currentSong.source === 'jiosaavn' ? '🎵 ' : currentSong.source === 'api' ? '🌐 Internet Archive' : '📁 Local File'}
                 {currentSong.album && currentSong.album !== 'Unknown Album' && ` • ${currentSong.album}`}
                 {currentSong.year && ` • ${currentSong.year}`}
               </div>
 
               <audio
+                key={currentSong?.id || currentSong?.url}
                 ref={audioRef}
                 src={currentSong.url}
                 preload="metadata"
@@ -934,7 +1143,23 @@ function App() {
             <h2 style={{ margin: '0', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)' }}>Songs ({songs.length})</h2>
           </div>
           
-          <div style={{ flex: 1, overflowY: 'auto' }} ref={songListRef}>
+          <div
+            style={{ flex: 1, overflowY: 'auto' }}
+            ref={songListRef}
+            onScroll={e => {
+              const el = e.target;
+              if (el.scrollHeight - el.scrollTop - el.clientHeight < 80 && !isLoading) {
+                if (mode === 'local' && hasMore) {
+                  fetchMoreRandom();
+                } else if (mode === 'local' && !hasMore) {
+                  setMode('online');
+                  fetchMoreOnline(true, 1);
+                } else {
+                  fetchMoreOnline(false, onlinePage + 1);
+                }
+              }
+            }}
+          >
             {songs.length === 0 && !isLoading ? (
               <div style={{ padding: '40px', textAlign: 'center' }}>
                 <p>No songs found</p>
@@ -948,19 +1173,24 @@ function App() {
                     className={`song-list-item${currentSong?.id === song.id ? ' active' : ''}`}
                     style={styles.songItem}
                   >
-                    <div>
-                      <div style={{ 
-                        fontWeight: 'bold', 
-                        marginBottom: '5px',
-                        fontSize: 'clamp(0.9rem, 3vw, 1rem)' // Responsive font size
-                      }}>
-                        {index + 1}. {song.title || 'Unknown Title'}
-                      </div>
-                      <div style={{ fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)' }}>
-                        {song.source === 'jiosaavn' 
-                          ? (song.artist && song.artist !== 'Unknown Artist' ? song.artist : 'Various Artists')
-                          : (song.artist || 'Unknown Artist')
-                        }
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      {/* Show thumbnail if available, else music note */}
+                      {song.thumbnail ? (
+                        <img src={song.thumbnail} alt="thumb" style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'cover', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }} />
+                      ) : (
+                        <span style={{ width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, background: '#232323', borderRadius: 8, color: '#1db954' }}>🎵</span>
+                      )}
+                      <div>
+                        <div style={{ 
+                          fontWeight: 'bold', 
+                          marginBottom: '5px',
+                          fontSize: 'clamp(0.9rem, 3vw, 1rem)'
+                        }}>
+                          {song.title || 'Unknown Title'}
+                        </div>
+                        <div style={{ fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)' }}>
+                          {song.artist || 'Unknown Artist'}
+                        </div>
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', fontSize: 'clamp(0.7rem, 2vw, 0.8rem)' }}>
@@ -1022,7 +1252,7 @@ function App() {
           opacity: 0.8
         }}>
           <p>
-            🎵 Built with React + Flask • Enhanced with modern UI/UX • JioSaavn Integration
+            🎵 M.S Music 🎵
           </p>
         </footer>
       </div>
