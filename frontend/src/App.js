@@ -195,7 +195,13 @@ function App() {
     } else if (isShuffled) {
       nextIndex = Math.floor(Math.random() * songs.length);
     } else {
-      nextIndex = (currentIndex + 1) % songs.length;
+      nextIndex = currentIndex + 1;
+    }
+    // If nextIndex is out of bounds, stop playback (Spotify-like)
+    if (nextIndex >= songs.length) {
+      setIsPlaying(false);
+      // Optionally, you can show a toast or UI feedback here
+      return;
     }
     setCurrentIndex(nextIndex);
     setCurrentSong(songs[nextIndex]);
@@ -296,10 +302,40 @@ function App() {
     if (!audio) return;
     const updateTime = () => {
       setCurrentTime(audio.currentTime);
-      console.log('audio.currentTime:', audio.currentTime);
+      // console.log('audio.currentTime:', audio.currentTime);
     };
     const updateDuration = () => setDuration(audio.duration);
-    const onEnded = () => handleNext();
+    const onEnded = async () => {
+      // Only advance if not at the end of the list
+      if (repeatMode === 'one') {
+        audio.currentTime = 0;
+        audio.play();
+      } else if (isShuffled) {
+        handleNext();
+      } else if (currentIndex + 1 < songs.length) {
+        handleNext();
+      } else if (hasMore) {
+        // At end, but more songs can be loaded: load more and continue
+        setIsLoading(true);
+        let prevSongsLen = songs.length;
+        if (mode === 'local') {
+          await fetchMoreRandom();
+        } else if (mode === 'online') {
+          await fetchMoreOnline(false, onlinePage + 1);
+        }
+        setIsLoading(false);
+        // If new songs loaded, play the next one
+        if (songs.length > prevSongsLen) {
+          setCurrentIndex(prevSongsLen);
+          setCurrentSong(songs[prevSongsLen]);
+          setIsPlaying(true);
+        } else {
+          setIsPlaying(false); // No more songs loaded
+        }
+      } else {
+        setIsPlaying(false); // Stop playback at end
+      }
+    };
     const onPlay = () => {
       setIsPlaying(true);
       setCurrentTime(audio.currentTime);
@@ -320,7 +356,7 @@ function App() {
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('seeked', onSeeked);
     };
-  }, [currentSong, handleNext]);
+  }, [currentSong, handleNext, repeatMode, isShuffled, currentIndex, songs.length]);
 
   // Volume control
   useEffect(() => {
@@ -1031,7 +1067,23 @@ function App() {
             <h2 style={{ margin: '0', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)' }}>Songs ({songs.length})</h2>
           </div>
           
-          <div style={{ flex: 1, overflowY: 'auto' }} ref={songListRef}>
+          <div
+            style={{ flex: 1, overflowY: 'auto' }}
+            ref={songListRef}
+            onScroll={e => {
+              const el = e.target;
+              if (el.scrollHeight - el.scrollTop - el.clientHeight < 80 && !isLoading) {
+                if (mode === 'local' && hasMore) {
+                  fetchMoreRandom();
+                } else if (mode === 'local' && !hasMore) {
+                  setMode('online');
+                  fetchMoreOnline(true, 1);
+                } else {
+                  fetchMoreOnline(false, onlinePage + 1);
+                }
+              }
+            }}
+          >
             {songs.length === 0 && !isLoading ? (
               <div style={{ padding: '40px', textAlign: 'center' }}>
                 <p>No songs found</p>
