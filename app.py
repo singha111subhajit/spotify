@@ -6,6 +6,11 @@ import requests
 import random
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, TIT2, TPE1, TALB, TDRC, TYER, ID3NoHeaderError
+import sqlite3
+import jwt
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime, timedelta
+from functools import wraps
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
@@ -17,6 +22,207 @@ ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg'}
 
 # JioSaavn API endpoint (unofficial public API)
 JIOSAAVN_API_BASE = 'https://saavn.dev/api'
+
+# JWT secret key (should be in env in production)
+JWT_SECRET = 'supersecretkey'
+JWT_ALGO = 'HS256'
+JWT_EXP_DELTA_SECONDS = 7 * 24 * 3600  # 7 days
+
+DB_PATH = 'music_app.db'
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    conn = get_db()
+    c = conn.cursor()
+    # User table
+    c.execute('''CREATE TABLE IF NOT EXISTS user (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        user_id TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL
+    )''')
+    # Playlist table
+    c.execute('''CREATE TABLE IF NOT EXISTS playlist (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES user(id)
+    )''')
+    # PlaylistSong table
+    c.execute('''CREATE TABLE IF NOT EXISTS playlistsong (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        playlist_id INTEGER NOT NULL,
+        song_id TEXT NOT NULL,
+        song_title TEXT NOT NULL,
+        FOREIGN KEY(playlist_id) REFERENCES playlist(id)
+    )''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# --- JWT Auth Helpers ---
+def create_jwt(user_id):
+    payload = {
+        'user_id': user_id,
+        'exp': datetime.utcnow() + timedelta(seconds=JWT_EXP_DELTA_SECONDS)
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
+
+def decode_jwt(token):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
+        return payload['user_id']
+    except Exception:
+        return None
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.headers.get('Authorization', None)
+        if not auth or not auth.startswith('Bearer '):
+            return jsonify({'error': 'Missing or invalid token'}), 401
+        token = auth.split(' ')[1]
+        user_id = decode_jwt(token)
+        if not user_id:
+            return jsonify({'error': 'Invalid or expired token'}), 401
+        request.user_id = user_id
+        return f(*args, **kwargs)
+    return decorated
+
+# --- User Endpoints ---
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.json
+    username = data.get('username')
+    user_id = data.get('user_id')
+    password = data.get('password')
+    if not username or not user_id or not password:
+        return jsonify({'error': 'Missing fields'}), 400
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT id FROM user WHERE user_id = ?', (user_id,))
+    if c.fetchone():
+        return jsonify({'error': 'User ID already exists'}), 400
+    hashed = generate_password_hash(password)
+    c.execute('INSERT INTO user (username, user_id, password) VALUES (?, ?, ?)', (username, user_id, hashed))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Registered successfully'})
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    user_id = data.get('user_id')
+    password = data.get('password')
+    if not user_id or not password:
+        return jsonify({'error': 'Missing fields'}), 400
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT id, password FROM user WHERE user_id = ?', (user_id,))
+    row = c.fetchone()
+    if not row or not check_password_hash(row['password'], password):
+        return jsonify({'error': 'Invalid credentials'}), 401
+    token = create_jwt(user_id)
+    return jsonify({'token': token})
+
+@app.route('/me', methods=['GET'])
+@login_required
+def me():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT id, username, user_id FROM user WHERE user_id = ?', (request.user_id,))
+    row = c.fetchone()
+    if not row:
+        return jsonify({'error': 'User not found'}), 404
+    return jsonify({'id': row['id'], 'username': row['username'], 'user_id': row['user_id']})
+
+# --- Playlist Endpoints ---
+@app.route('/playlists', methods=['POST'])
+@login_required
+def create_playlist():
+    data = request.json
+    name = data.get('name')
+    if not name:
+        return jsonify({'error': 'Missing playlist name'}), 400
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT id FROM user WHERE user_id = ?', (request.user_id,))
+    user_row = c.fetchone()
+    if not user_row:
+        return jsonify({'error': 'User not found'}), 404
+    user_db_id = user_row['id']
+    c.execute('INSERT INTO playlist (name, user_id) VALUES (?, ?)', (name, user_db_id))
+    conn.commit()
+    playlist_id = c.lastrowid
+    conn.close()
+    return jsonify({'id': playlist_id, 'name': name})
+
+@app.route('/playlists', methods=['GET'])
+@login_required
+def get_playlists():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT id FROM user WHERE user_id = ?', (request.user_id,))
+    user_row = c.fetchone()
+    if not user_row:
+        return jsonify({'error': 'User not found'}), 404
+    user_db_id = user_row['id']
+    c.execute('SELECT id, name FROM playlist WHERE user_id = ?', (user_db_id,))
+    playlists = [{'id': row['id'], 'name': row['name']} for row in c.fetchall()]
+    conn.close()
+    return jsonify({'playlists': playlists})
+
+@app.route('/playlists/<int:playlist_id>/songs', methods=['POST'])
+@login_required
+def add_song_to_playlist(playlist_id):
+    data = request.json
+    song_id = data.get('song_id')
+    song_title = data.get('song_title')
+    if not song_id or not song_title:
+        return jsonify({'error': 'Missing song_id or song_title'}), 400
+    conn = get_db()
+    c = conn.cursor()
+    # Check playlist ownership
+    c.execute('SELECT p.id FROM playlist p JOIN user u ON p.user_id = u.id WHERE p.id = ? AND u.user_id = ?', (playlist_id, request.user_id))
+    if not c.fetchone():
+        return jsonify({'error': 'Playlist not found or not owned by user'}), 404
+    c.execute('INSERT INTO playlistsong (playlist_id, song_id, song_title) VALUES (?, ?, ?)', (playlist_id, song_id, song_title))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Song added'})
+
+@app.route('/playlists/<int:playlist_id>/songs', methods=['GET'])
+@login_required
+def get_playlist_songs(playlist_id):
+    conn = get_db()
+    c = conn.cursor()
+    # Check playlist ownership
+    c.execute('SELECT p.id FROM playlist p JOIN user u ON p.user_id = u.id WHERE p.id = ? AND u.user_id = ?', (playlist_id, request.user_id))
+    if not c.fetchone():
+        return jsonify({'error': 'Playlist not found or not owned by user'}), 404
+    c.execute('SELECT id, song_id, song_title FROM playlistsong WHERE playlist_id = ?', (playlist_id,))
+    songs = [{'id': row['id'], 'song_id': row['song_id'], 'song_title': row['song_title']} for row in c.fetchall()]
+    conn.close()
+    return jsonify({'songs': songs})
+
+@app.route('/playlists/<int:playlist_id>/songs/<int:song_db_id>', methods=['DELETE'])
+@login_required
+def remove_song_from_playlist(playlist_id, song_db_id):
+    conn = get_db()
+    c = conn.cursor()
+    # Check playlist ownership
+    c.execute('SELECT p.id FROM playlist p JOIN user u ON p.user_id = u.id WHERE p.id = ? AND u.user_id = ?', (playlist_id, request.user_id))
+    if not c.fetchone():
+        return jsonify({'error': 'Playlist not found or not owned by user'}), 404
+    c.execute('DELETE FROM playlistsong WHERE id = ? AND playlist_id = ?', (song_db_id, playlist_id))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Song removed'})
 
 def allowed_file(filename):
     return '.' in filename and \
