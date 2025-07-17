@@ -935,8 +935,8 @@ function App() {
     setPlaylistLoading(true);
     try {
       await axios.post(`${API_BASE}/playlists`, { name: newPlaylistName }, { headers: { Authorization: `Bearer ${jwt}` } });
-      setNewPlaylistName('');
-      fetchPlaylists();
+      await fetchPlaylists();
+      setNewPlaylistName(''); // Move this after fetchPlaylists
     } catch (err) {
       setPlaylistError('Failed to create playlist');
     } finally {
