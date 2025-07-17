@@ -14,7 +14,7 @@
 3. **Build and run with Docker**
    ```bash
    docker build -t music-player .
-   docker run -p 5000:5000 music-player
+   docker run -p 5600:5600 music-player
    ```
 
 4. **Open your browser**
