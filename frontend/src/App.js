@@ -72,6 +72,37 @@ function App() {
   const [playlistLoading, setPlaylistLoading] = useState(false);
   const [playlistError, setPlaylistError] = useState('');
 
+  // --- Add to Playlist Modal & Toast ---
+  const [addToPlaylistModal, setAddToPlaylistModal] = useState({ open: false, song: null });
+  const [toast, setToast] = useState('');
+
+  const openAddToPlaylistModal = (song) => setAddToPlaylistModal({ open: true, song });
+  const closeAddToPlaylistModal = () => setAddToPlaylistModal({ open: false, song: null });
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+
+  const handleAddSongToPlaylistModal = async (playlistId) => {
+    if (!addToPlaylistModal.song) return;
+    await handleAddSongToPlaylist(playlistId, addToPlaylistModal.song);
+    showToast('Song added to playlist!');
+    closeAddToPlaylistModal();
+  };
+
+  const AddToPlaylistModal = () => (
+    <div className="modal-backdrop" onClick={closeAddToPlaylistModal}>
+      <div className="add-to-playlist-modal" onClick={e => e.stopPropagation()}>
+        <h3>Add to Playlist</h3>
+        <div className="playlist-list">
+          {playlists.length === 0 ? (
+            <div>No playlists found. Create one first!</div>
+          ) : playlists.map(pl => (
+            <div key={pl.id} onClick={() => handleAddSongToPlaylistModal(pl.id)}>{pl.name}</div>
+          ))}
+        </div>
+        <button onClick={closeAddToPlaylistModal} style={{ marginTop: 8 }}>Cancel</button>
+      </div>
+    </div>
+  );
+
   // Initialize app
   // Helper to load shuffled/random songs (local/demo)
   const loadRandomSongs = async (reset = true, nextPage = 1) => {
@@ -1058,6 +1089,8 @@ function App() {
         </header>
         {authModalOpen && <AuthModal />}
         {playlistSidebarOpen && <PlaylistSidebar />}
+        {addToPlaylistModal.open && <AddToPlaylistModal />}
+        {toast && <div className="toast">{toast}</div>}
 
         {/* Search */}
         <div style={styles.searchContainer}>
@@ -1362,6 +1395,15 @@ function App() {
                           fontSize: 'clamp(0.9rem, 3vw, 1rem)'
                         }}>
                           {song.title || 'Unknown Title'}
+                          {user && (
+                            <button
+                              className="add-to-playlist-btn"
+                              title="Add to Playlist"
+                              onClick={e => { e.stopPropagation(); openAddToPlaylistModal(song); }}
+                            >
+                              ➕
+                            </button>
+                          )}
                         </div>
                         <div style={{ fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)' }}>
                           {song.artist || 'Unknown Artist'}
