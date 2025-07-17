@@ -57,6 +57,21 @@ function App() {
   
   const audioRef = useRef(null);
 
+  // --- Auth & Playlist State ---
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [jwt, setJwt] = useState(() => localStorage.getItem('jwt') || '');
+  const [user, setUser] = useState(null);
+  const [playlistSidebarOpen, setPlaylistSidebarOpen] = useState(false);
+  const [playlists, setPlaylists] = useState([]);
+  const [playlistSongs, setPlaylistSongs] = useState([]);
+  const [selectedPlaylist, setSelectedPlaylist] = useState(null);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [playlistLoading, setPlaylistLoading] = useState(false);
+  const [playlistError, setPlaylistError] = useState('');
+
   // Initialize app
   // Helper to load shuffled/random songs (local/demo)
   const loadRandomSongs = async (reset = true, nextPage = 1) => {
@@ -824,6 +839,122 @@ function App() {
     }
   };
 
+  // --- Auth Functions ---
+  useEffect(() => {
+    if (jwt) {
+      axios.get(`${API_BASE}/me`, { headers: { Authorization: `Bearer ${jwt}` } })
+        .then(res => setUser(res.data))
+        .catch(() => { setUser(null); setJwt(''); localStorage.removeItem('jwt'); });
+    } else {
+      setUser(null);
+    }
+  }, [jwt]);
+
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError('');
+    const form = e.target;
+    const username = form.username?.value;
+    const user_id = form.user_id.value;
+    const password = form.password.value;
+    try {
+      if (authMode === 'register') {
+        await axios.post(`${API_BASE}/register`, { username, user_id, password });
+        setAuthMode('login');
+        setAuthError('Registered! Please log in.');
+      } else {
+        const res = await axios.post(`${API_BASE}/login`, { user_id, password });
+        setJwt(res.data.token);
+        localStorage.setItem('jwt', res.data.token);
+        setAuthModalOpen(false);
+      }
+    } catch (err) {
+      setAuthError(err.response?.data?.error || 'Auth failed');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setJwt('');
+    setUser(null);
+    localStorage.removeItem('jwt');
+    setPlaylistSidebarOpen(false);
+  };
+
+  // --- Playlist Functions ---
+  const fetchPlaylists = async () => {
+    if (!jwt) return;
+    setPlaylistLoading(true);
+    setPlaylistError('');
+    try {
+      const res = await axios.get(`${API_BASE}/playlists`, { headers: { Authorization: `Bearer ${jwt}` } });
+      setPlaylists(res.data.playlists);
+    } catch (err) {
+      setPlaylistError('Failed to load playlists');
+    } finally {
+      setPlaylistLoading(false);
+    }
+  };
+
+  const handleCreatePlaylist = async (e) => {
+    e.preventDefault();
+    if (!newPlaylistName.trim()) return;
+    setPlaylistLoading(true);
+    try {
+      await axios.post(`${API_BASE}/playlists`, { name: newPlaylistName }, { headers: { Authorization: `Bearer ${jwt}` } });
+      setNewPlaylistName('');
+      fetchPlaylists();
+    } catch (err) {
+      setPlaylistError('Failed to create playlist');
+    } finally {
+      setPlaylistLoading(false);
+    }
+  };
+
+  const handleSelectPlaylist = async (playlist) => {
+    setSelectedPlaylist(playlist);
+    setPlaylistLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE}/playlists/${playlist.id}/songs`, { headers: { Authorization: `Bearer ${jwt}` } });
+      setPlaylistSongs(res.data.songs);
+    } catch (err) {
+      setPlaylistSongs([]);
+    } finally {
+      setPlaylistLoading(false);
+    }
+  };
+
+  const handleAddSongToPlaylist = async (playlistId, song) => {
+    if (!jwt) return;
+    setPlaylistLoading(true);
+    try {
+      await axios.post(`${API_BASE}/playlists/${playlistId}/songs`, { song_id: song.id, song_title: song.title }, { headers: { Authorization: `Bearer ${jwt}` } });
+      if (selectedPlaylist && selectedPlaylist.id === playlistId) handleSelectPlaylist(selectedPlaylist);
+    } catch (err) {
+      setPlaylistError('Failed to add song');
+    } finally {
+      setPlaylistLoading(false);
+    }
+  };
+
+  const handleRemoveSongFromPlaylist = async (playlistId, songDbId) => {
+    if (!jwt) return;
+    setPlaylistLoading(true);
+    try {
+      await axios.delete(`${API_BASE}/playlists/${playlistId}/songs/${songDbId}`, { headers: { Authorization: `Bearer ${jwt}` } });
+      if (selectedPlaylist && selectedPlaylist.id === playlistId) handleSelectPlaylist(selectedPlaylist);
+    } catch (err) {
+      setPlaylistError('Failed to remove song');
+    } finally {
+      setPlaylistLoading(false);
+    }
+  };
+
+  // Fetch playlists when sidebar opens
+  useEffect(() => { if (playlistSidebarOpen) fetchPlaylists(); }, [playlistSidebarOpen, jwt]);
+
   if (error) {
     return (
       <div style={styles.container}>
@@ -846,42 +977,87 @@ function App() {
   // See more button should always show if there are any songs
   const canShowSeeMore = songs.length > 0;
 
+  // --- UI Components ---
+  // Auth Modal
+  const AuthModal = () => (
+    <div className="modal-backdrop" onClick={() => setAuthModalOpen(false)}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <h2>{authMode === 'login' ? 'Login' : 'Register'}</h2>
+        <form onSubmit={handleAuth}>
+          {authMode === 'register' && (
+            <input name="username" placeholder="Username" required style={{ marginBottom: 8 }} />
+          )}
+          <input name="user_id" placeholder="User ID" required style={{ marginBottom: 8 }} />
+          <input name="password" type="password" placeholder="Password" required style={{ marginBottom: 8 }} />
+          <button type="submit" disabled={authLoading} style={{ width: '100%' }}>
+            {authLoading ? 'Loading...' : (authMode === 'login' ? 'Login' : 'Register')}
+          </button>
+        </form>
+        <div style={{ marginTop: 8, color: 'red' }}>{authError}</div>
+        <div style={{ marginTop: 12 }}>
+          {authMode === 'login' ? (
+            <span>New user? <button onClick={() => { setAuthMode('register'); setAuthError(''); }} style={{ color: '#1db954', background: 'none', border: 'none', cursor: 'pointer' }}>Register</button></span>
+          ) : (
+            <span>Already have an account? <button onClick={() => { setAuthMode('login'); setAuthError(''); }} style={{ color: '#1db954', background: 'none', border: 'none', cursor: 'pointer' }}>Login</button></span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Playlist Sidebar
+  const PlaylistSidebar = () => (
+    <div className="playlist-sidebar-backdrop" onClick={() => setPlaylistSidebarOpen(false)}>
+      <div className="playlist-sidebar" onClick={e => e.stopPropagation()}>
+        <h2>My Playlists</h2>
+        <form onSubmit={handleCreatePlaylist} style={{ marginBottom: 12 }}>
+          <input value={newPlaylistName} onChange={e => setNewPlaylistName(e.target.value)} placeholder="New playlist name" style={{ marginRight: 8 }} />
+          <button type="submit" disabled={playlistLoading}>Create</button>
+        </form>
+        {playlistError && <div style={{ color: 'red', marginBottom: 8 }}>{playlistError}</div>}
+        <div style={{ maxHeight: 200, overflowY: 'auto', marginBottom: 12 }}>
+          {playlistLoading ? <div>Loading...</div> : playlists.length === 0 ? <div>No playlists</div> : playlists.map(pl => (
+            <div key={pl.id} style={{ marginBottom: 6, cursor: 'pointer', fontWeight: selectedPlaylist && selectedPlaylist.id === pl.id ? 'bold' : 'normal' }} onClick={() => handleSelectPlaylist(pl)}>{pl.name}</div>
+          ))}
+        </div>
+        {selectedPlaylist && (
+          <div>
+            <h3>{selectedPlaylist.name}</h3>
+            <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+              {playlistLoading ? <div>Loading...</div> : playlistSongs.length === 0 ? <div>No songs</div> : playlistSongs.map(song => (
+                <div key={song.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span>{song.song_title}</span>
+                  <button onClick={() => handleRemoveSongFromPlaylist(selectedPlaylist.id, song.id)} style={{ color: 'red', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <button onClick={handleLogout} style={{ marginTop: 16, width: '100%' }}>Logout</button>
+      </div>
+    </div>
+  );
+
   return (
     <div style={styles.container}>
       <div style={styles.content}>
         {/* Header */}
         <header style={styles.header}>
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            gap: 'clamp(10px, 3vw, 16px)', // Responsive gap
-            flexWrap: 'wrap' // Allow wrapping
-          }}>
-            <h1 style={styles.title}>🎵 Ultimate Music Player</h1>
-            <button
-              onClick={toggleTheme}
-              style={{
-                border: 'none',
-                borderRadius: 20,
-                padding: 'clamp(6px, 2vw, 8px) clamp(12px, 3vw, 18px)', // Responsive padding
-                background: 'var(--bg-card)',
-                color: 'var(--text-main)',
-                fontWeight: 600,
-                fontSize: 'clamp(12px, 3vw, 16px)', // Responsive font size
-                cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                whiteSpace: 'nowrap'
-              }}
-              title="Toggle theme"
-            >
-              {getThemeLabel()}
-            </button>
+          <h1 style={styles.title}>🎵 DhoonHub</h1>
+          <div style={{ position: 'absolute', top: 20, right: 20, display: 'flex', gap: 12 }}>
+            <button onClick={toggleTheme} style={{ border: 'none', background: 'none', color: 'var(--text-main)', fontSize: 18, cursor: 'pointer' }}>{getThemeLabel()}</button>
+            {user ? (
+              <button onClick={() => setPlaylistSidebarOpen(true)} style={{ border: 'none', background: '#1db954', color: '#fff', borderRadius: 20, padding: '8px 18px', fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>My Playlists</button>
+            ) : (
+              <button onClick={() => { setAuthModalOpen(true); setAuthMode('login'); }} style={{ border: 'none', background: '#1db954', color: '#fff', borderRadius: 20, padding: '8px 18px', fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>Login / Register</button>
+            )}
           </div>
           <p style={{ ...styles.subtitle, color: 'var(--text-secondary)' }}>
             Play, search & enjoy your favorite tracks in one click
           </p>
         </header>
+        {authModalOpen && <AuthModal />}
+        {playlistSidebarOpen && <PlaylistSidebar />}
 
         {/* Search */}
         <div style={styles.searchContainer}>
