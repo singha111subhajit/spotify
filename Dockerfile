@@ -13,8 +13,9 @@ COPY requirements.txt ./
 RUN pip install -r requirements.txt
 COPY . ./
 
-
 # Copy React build output to Flask static and template folders for Flask to serve
+# Ensure the build/static directory exists before copying
+RUN test -d frontend/build/static
 RUN mkdir -p static && mkdir -p templates
 COPY --from=frontend /app/frontend/build/static ./static/
 COPY --from=frontend /app/frontend/build/index.html ./templates/index.html
