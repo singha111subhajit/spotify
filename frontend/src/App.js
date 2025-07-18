@@ -69,6 +69,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [playlistSidebarOpen, setPlaylistSidebarOpen] = useState(false);
   // Debug print for sidebar open state
+  /*
   useEffect(() => {
     console.log('[DEBUG] playlistSidebarOpen changed:', playlistSidebarOpen);
   }, [playlistSidebarOpen]);
@@ -76,6 +77,7 @@ function App() {
   useEffect(() => {
     console.log('[DEBUG] isPlaying changed:', isPlaying);
   }, [isPlaying]);
+  */
   const [playlist, setPlaylist] = useState(null); // Only one playlist per user
   const [playlistSongs, setPlaylistSongs] = useState([]);
   const [playlistLoading, setPlaylistLoading] = useState(false);
@@ -353,6 +355,7 @@ function App() {
 
   // --- useEffect hooks ---
   // Auto-play when song changes (only reload audio if song changes)
+  /*
   useEffect(() => {
     if (currentSong && audioRef.current) {
       audioRef.current.pause();
@@ -369,8 +372,10 @@ function App() {
     }
     // eslint-disable-next-line
   }, [currentSong]);
+  */
 
   // Play/pause effect (do not reload audio)
+  /*
   useEffect(() => {
     if (!audioRef.current) return;
     if (isPlaying) {
@@ -382,8 +387,10 @@ function App() {
       audioRef.current.pause();
     }
   }, [isPlaying]);
+  */
 
   // Audio event handlers
+  /*
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -417,6 +424,7 @@ function App() {
       audio.removeEventListener('seeked', onSeeked);
     };
   }, [currentSong, repeatMode, isShuffled, currentIndex, songs.length]);
+  */
 
   // Auto-preload songs when getting close to the end for seamless playback
   /*
@@ -436,13 +444,16 @@ function App() {
   */
 
   // Volume control
+  /*
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = isMuted ? 0 : volume;
     }
   }, [volume, isMuted]);
+  */
 
   // Keyboard shortcuts
+  /*
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (e.target.tagName === 'INPUT') return;
@@ -481,6 +492,7 @@ function App() {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, []);
+  */
 
   // Player controls
   // ...existing code...
@@ -828,6 +840,7 @@ function App() {
   };
 
   // --- Auth Functions ---
+  /*
   useEffect(() => {
     if (jwt) {
       axios.get(`${API_BASE}/me`, { headers: { Authorization: `Bearer ${jwt}` } })
@@ -837,6 +850,7 @@ function App() {
       setUser(null);
     }
   }, [jwt]);
+  */
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -926,12 +940,14 @@ function App() {
   };
 
   // Fetch playlist when sidebar opens
+  /*
   useEffect(() => { 
     if (playlistSidebarOpen) {
       console.log('[DEBUG] useEffect: playlistSidebarOpen is true, calling fetchPlaylistAndSongs');
       fetchPlaylistAndSongs();
     }
   }, [playlistSidebarOpen, jwt]);
+  */
 
   if (error) {
     return (
