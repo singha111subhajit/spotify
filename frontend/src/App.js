@@ -1279,8 +1279,6 @@ function App() {
                   console.error('Audio error:', e);
                   console.log('Failed URL:', currentSong.url);
                 }}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
                 onTimeUpdate={e => setCurrentTime(e.target.currentTime)}
                 onLoadedMetadata={e => setDuration(e.target.duration)}
                 onEnded={() => {
