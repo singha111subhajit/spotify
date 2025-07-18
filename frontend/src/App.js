@@ -384,14 +384,10 @@ function App() {
   }, [isPlaying]);
 
   // Audio event handlers
-  /*
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const updateTime = () => {
-      setCurrentTime(audio.currentTime);
-      // console.log('audio.currentTime:', audio.currentTime);
-    };
+    const updateTime = () => setCurrentTime(audio.currentTime);
     const updateDuration = () => setDuration(audio.duration);
     const onEnded = async () => {
       // Only advance if not at the end of the list
@@ -399,55 +395,28 @@ function App() {
         audio.currentTime = 0;
         audio.play();
       } else if (isShuffled) {
-        handleNext();
+        // Only update index, not song state
+        const nextIndex = Math.floor(Math.random() * songs.length);
+        setCurrentIndex(nextIndex);
       } else if (currentIndex + 1 < songs.length) {
-        handleNext();
-      } else if (hasMore) {
-        // At end, but more songs can be loaded: load more and continue
-        setIsLoading(true);
-        let prevSongsLen = songs.length;
-        if (mode === 'local') {
-          await fetchMoreRandom();
-        } else if (mode === 'online') {
-          await fetchMoreOnline(false, onlinePage + 1);
-        }
-        setIsLoading(false);
-        // If new songs loaded, play the next one
-        if (songs.length > prevSongsLen) {
-          setCurrentIndex(prevSongsLen);
-          setCurrentSong(songs[prevSongsLen]);
-          setIsPlaying(true);
-        } else {
-          setIsPlaying(false); // No more songs loaded
-        }
+        setCurrentIndex(currentIndex + 1);
       } else {
-        setIsPlaying(false); // Stop playback at end
+        // End of playlist, stop playback
+        setIsPlaying(false);
       }
-    };
-    const onPlay = () => {
-      // setIsPlaying(true); // REMOVE to prevent feedback loop
-      setCurrentTime(audio.currentTime);
-    };
-    const onPause = () => {
-      // setIsPlaying(false); // REMOVE to prevent feedback loop
     };
     const onSeeked = () => setCurrentTime(audio.currentTime);
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
     audio.addEventListener('ended', onEnded);
-    audio.addEventListener('play', onPlay);
-    audio.addEventListener('pause', onPause);
     audio.addEventListener('seeked', onSeeked);
     return () => {
       audio.removeEventListener('timeupdate', updateTime);
       audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', onEnded);
-      audio.removeEventListener('play', onPlay);
-      audio.removeEventListener('pause', onPause);
       audio.removeEventListener('seeked', onSeeked);
     };
-  }, [currentSong, handleNext, repeatMode, isShuffled, currentIndex, songs.length]);
-  */
+  }, [currentSong, repeatMode, isShuffled, currentIndex, songs.length]);
 
   // Auto-preload songs when getting close to the end for seamless playback
   /*
