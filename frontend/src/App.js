@@ -65,43 +65,14 @@ function App() {
   const [jwt, setJwt] = useState(() => localStorage.getItem('jwt') || '');
   const [user, setUser] = useState(null);
   const [playlistSidebarOpen, setPlaylistSidebarOpen] = useState(false);
-  const [playlists, setPlaylists] = useState([]);
+  const [playlist, setPlaylist] = useState(null); // Only one playlist per user
   const [playlistSongs, setPlaylistSongs] = useState([]);
-  const [selectedPlaylist, setSelectedPlaylist] = useState(null);
-  const [newPlaylistName, setNewPlaylistName] = useState('');
   const [playlistLoading, setPlaylistLoading] = useState(false);
   const [playlistError, setPlaylistError] = useState('');
 
-  // --- Add to Playlist Modal & Toast ---
-  const [addToPlaylistModal, setAddToPlaylistModal] = useState({ open: false, song: null });
+  // --- Toast for feedback ---
   const [toast, setToast] = useState('');
-
-  const openAddToPlaylistModal = (song) => setAddToPlaylistModal({ open: true, song });
-  const closeAddToPlaylistModal = () => setAddToPlaylistModal({ open: false, song: null });
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
-
-  const handleAddSongToPlaylistModal = async (playlistId) => {
-    if (!addToPlaylistModal.song) return;
-    await handleAddSongToPlaylist(playlistId, addToPlaylistModal.song);
-    showToast('Song added to playlist!');
-    closeAddToPlaylistModal();
-  };
-
-  const AddToPlaylistModal = () => (
-    <div className="modal-backdrop" onClick={closeAddToPlaylistModal}>
-      <div className="add-to-playlist-modal" onClick={e => e.stopPropagation()}>
-        <h3>Add to Playlist</h3>
-        <div className="playlist-list">
-          {playlists.length === 0 ? (
-            <div>No playlists found. Create one first!</div>
-          ) : playlists.map(pl => (
-            <div key={pl.id} onClick={() => handleAddSongToPlaylistModal(pl.id)}>{pl.name}</div>
-          ))}
-        </div>
-        <button onClick={closeAddToPlaylistModal} style={{ marginTop: 8 }}>Cancel</button>
-      </div>
-    </div>
-  );
 
   // Initialize app
   // Helper to load shuffled/random songs (local/demo)
@@ -915,54 +886,37 @@ function App() {
   };
 
   // --- Playlist Functions ---
-  const fetchPlaylists = async () => {
+  // Fetch default playlist and its songs
+  const fetchPlaylistAndSongs = async () => {
     if (!jwt) return;
     setPlaylistLoading(true);
     setPlaylistError('');
     try {
       const res = await axios.get(`${API_BASE}/playlists`, { headers: { Authorization: `Bearer ${jwt}` } });
-      setPlaylists(res.data.playlists);
+      if (res.data.playlists && res.data.playlists.length > 0) {
+        setPlaylist(res.data.playlists[0]);
+        // Fetch songs for this playlist
+        const songsRes = await axios.get(`${API_BASE}/playlists/${res.data.playlists[0].id}/songs`, { headers: { Authorization: `Bearer ${jwt}` } });
+        setPlaylistSongs(songsRes.data.songs);
+      } else {
+        setPlaylist(null);
+        setPlaylistSongs([]);
+      }
     } catch (err) {
-      setPlaylistError('Failed to load playlists');
+      setPlaylistError('Failed to load playlist');
     } finally {
       setPlaylistLoading(false);
     }
   };
 
-  const handleCreatePlaylist = async (e) => {
-    e.preventDefault();
-    if (!newPlaylistName.trim()) return;
+  // Add song to default playlist
+  const handleAddSongToPlaylist = async (song) => {
+    if (!jwt || !playlist) return;
     setPlaylistLoading(true);
     try {
-      await axios.post(`${API_BASE}/playlists`, { name: newPlaylistName }, { headers: { Authorization: `Bearer ${jwt}` } });
-      await fetchPlaylists();
-      setNewPlaylistName(''); // Move this after fetchPlaylists
-    } catch (err) {
-      setPlaylistError('Failed to create playlist');
-    } finally {
-      setPlaylistLoading(false);
-    }
-  };
-
-  const handleSelectPlaylist = async (playlist) => {
-    setSelectedPlaylist(playlist);
-    setPlaylistLoading(true);
-    try {
-      const res = await axios.get(`${API_BASE}/playlists/${playlist.id}/songs`, { headers: { Authorization: `Bearer ${jwt}` } });
-      setPlaylistSongs(res.data.songs);
-    } catch (err) {
-      setPlaylistSongs([]);
-    } finally {
-      setPlaylistLoading(false);
-    }
-  };
-
-  const handleAddSongToPlaylist = async (playlistId, song) => {
-    if (!jwt) return;
-    setPlaylistLoading(true);
-    try {
-      await axios.post(`${API_BASE}/playlists/${playlistId}/songs`, { song_id: song.id, song_title: song.title }, { headers: { Authorization: `Bearer ${jwt}` } });
-      if (selectedPlaylist && selectedPlaylist.id === playlistId) handleSelectPlaylist(selectedPlaylist);
+      await axios.post(`${API_BASE}/playlists/${playlist.id}/songs`, { song_id: song.id, song_title: song.title }, { headers: { Authorization: `Bearer ${jwt}` } });
+      showToast('Song added to playlist!');
+      fetchPlaylistAndSongs();
     } catch (err) {
       setPlaylistError('Failed to add song');
     } finally {
@@ -970,12 +924,13 @@ function App() {
     }
   };
 
-  const handleRemoveSongFromPlaylist = async (playlistId, songDbId) => {
-    if (!jwt) return;
+  // Remove song from default playlist
+  const handleRemoveSongFromPlaylist = async (songDbId) => {
+    if (!jwt || !playlist) return;
     setPlaylistLoading(true);
     try {
-      await axios.delete(`${API_BASE}/playlists/${playlistId}/songs/${songDbId}`, { headers: { Authorization: `Bearer ${jwt}` } });
-      if (selectedPlaylist && selectedPlaylist.id === playlistId) handleSelectPlaylist(selectedPlaylist);
+      await axios.delete(`${API_BASE}/playlists/${playlist.id}/songs/${songDbId}`, { headers: { Authorization: `Bearer ${jwt}` } });
+      fetchPlaylistAndSongs();
     } catch (err) {
       setPlaylistError('Failed to remove song');
     } finally {
@@ -983,8 +938,8 @@ function App() {
     }
   };
 
-  // Fetch playlists when sidebar opens
-  useEffect(() => { if (playlistSidebarOpen) fetchPlaylists(); }, [playlistSidebarOpen, jwt]);
+  // Fetch playlist when sidebar opens
+  useEffect(() => { if (playlistSidebarOpen) fetchPlaylistAndSongs(); }, [playlistSidebarOpen, jwt]);
 
   if (error) {
     return (
@@ -1036,38 +991,58 @@ function App() {
     </div>
   );
 
-  // Playlist Sidebar
-  const PlaylistSidebar = () => (
-    <div className="playlist-sidebar-backdrop" onClick={() => setPlaylistSidebarOpen(false)}>
-      <div className="playlist-sidebar" onClick={e => e.stopPropagation()}>
-        <h2>My Playlists</h2>
-        <form onSubmit={handleCreatePlaylist} style={{ marginBottom: 12 }}>
-          <input value={newPlaylistName} onChange={e => setNewPlaylistName(e.target.value)} placeholder="New playlist name" style={{ marginRight: 8 }} />
-          <button type="submit" disabled={playlistLoading}>Create</button>
-        </form>
-        {playlistError && <div style={{ color: 'red', marginBottom: 8 }}>{playlistError}</div>}
-        <div style={{ maxHeight: 200, overflowY: 'auto', marginBottom: 12 }}>
-          {playlistLoading ? <div>Loading...</div> : playlists.length === 0 ? <div>No playlists</div> : playlists.map(pl => (
-            <div key={pl.id} style={{ marginBottom: 6, cursor: 'pointer', fontWeight: selectedPlaylist && selectedPlaylist.id === pl.id ? 'bold' : 'normal' }} onClick={() => handleSelectPlaylist(pl)}>{pl.name}</div>
-          ))}
+  // Playlist Sidebar (function component, not affected by player state)
+  const PlaylistSidebar = React.memo(function PlaylistSidebar() {
+    return (
+      <div className="playlist-sidebar-backdrop" onClick={() => setPlaylistSidebarOpen(false)}>
+        <div className="playlist-sidebar" onClick={e => e.stopPropagation()}>
+          <h2 style={{marginBottom: 8}}>My Playlist</h2>
+          {playlistError && <div style={{ color: 'red', marginBottom: 8 }}>{playlistError}</div>}
+          {playlistLoading ? <div>Loading...</div> : !playlist ? <div>No playlist found</div> : (
+            <>
+              <h3 style={{margin: 0, fontSize: '1.1em', color: 'var(--spotify-green)'}}>{playlist.name}</h3>
+              <div style={{ maxHeight: 320, overflowY: 'auto', marginTop: 10 }}>
+                {playlistSongs.length === 0 ? <div style={{color:'#aaa'}}>No songs</div> : playlistSongs.map(song => {
+                  // Try to find full song info from main song list for better display
+                  const fullSong = songs.find(s => s.id === song.song_id);
+                  return (
+                    <div key={song.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #232323', cursor: 'pointer', background: currentSong?.id === song.song_id ? 'var(--spotify-green)' : 'transparent', color: currentSong?.id === song.song_id ? '#fff' : 'var(--text-main)'
+                    }}
+                      onClick={e => {
+                        // Only play song, do not close sidebar
+                        e.stopPropagation();
+                        const idx = songs.findIndex(s => s.id === song.song_id);
+                        if (idx !== -1) {
+                          setCurrentSong(songs[idx]);
+                          setCurrentIndex(idx);
+                          setIsPlaying(true);
+                        }
+                      }}
+                    >
+                      {/* Thumbnail */}
+                      {fullSong && fullSong.thumbnail ? (
+                        <img src={fullSong.thumbnail} alt="thumb" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover', boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }} />
+                      ) : (
+                        <span style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: '#232323', borderRadius: 6, color: '#1db954' }}>🎵</span>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: '1em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.song_title}</div>
+                        <div style={{ fontSize: '0.92em', color: currentSong?.id === song.song_id ? '#e0ffe0' : '#b3b3b3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fullSong?.artist || ''}</div>
+                      </div>
+                      <div style={{ fontSize: '0.9em', color: currentSong?.id === song.song_id ? '#e0ffe0' : '#b3b3b3', minWidth: 40, textAlign: 'right' }}>{fullSong?.duration ? formatTime(fullSong.duration) : ''}</div>
+                      <button onClick={e => { e.stopPropagation(); handleRemoveSongFromPlaylist(song.id); }} style={{ color: '#fff', background: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', marginLeft: 8, cursor: 'pointer', fontWeight: 700, fontSize: 16 }} title="Remove from playlist">−</button>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+          <button onClick={handleLogout} style={{ marginTop: 16, width: '100%', background: '#232323', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 0', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Logout</button>
         </div>
-        {selectedPlaylist && (
-          <div>
-            <h3>{selectedPlaylist.name}</h3>
-            <div style={{ maxHeight: 180, overflowY: 'auto' }}>
-              {playlistLoading ? <div>Loading...</div> : playlistSongs.length === 0 ? <div>No songs</div> : playlistSongs.map(song => (
-                <div key={song.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <span>{song.song_title}</span>
-                  <button onClick={() => handleRemoveSongFromPlaylist(selectedPlaylist.id, song.id)} style={{ color: 'red', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        <button onClick={handleLogout} style={{ marginTop: 16, width: '100%' }}>Logout</button>
       </div>
-    </div>
-  );
+    );
+  });
 
   return (
     <div style={styles.container}>
@@ -1088,8 +1063,8 @@ function App() {
           </p>
         </header>
         {authModalOpen && <AuthModal />}
-        {playlistSidebarOpen && <PlaylistSidebar />}
-        {addToPlaylistModal.open && <AddToPlaylistModal />}
+        {playlistSidebarOpen ? <PlaylistSidebar /> : null}
+        {/* No add-to-playlist modal needed for single playlist */}
         {toast && <div className="toast">{toast}</div>}
 
         {/* Search */}
@@ -1374,48 +1349,69 @@ function App() {
               </div>
             ) : (
               <>
-                {songs.map((song, index) => (
-                  <div
-                    key={song.id}
-                    onClick={() => handleSongSelect(song, index)}
-                    className={`song-list-item${currentSong?.id === song.id ? ' active' : ''}`}
-                    style={styles.songItem}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      {/* Show thumbnail if available, else music note */}
-                      {song.thumbnail ? (
-                        <img src={song.thumbnail} alt="thumb" style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'cover', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }} />
-                      ) : (
-                        <span style={{ width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, background: '#232323', borderRadius: 8, color: '#1db954' }}>🎵</span>
-                      )}
-                      <div>
-                        <div style={{ 
-                          fontWeight: 'bold', 
-                          marginBottom: '5px',
-                          fontSize: 'clamp(0.9rem, 3vw, 1rem)'
-                        }}>
-                          {song.title || 'Unknown Title'}
-                          {user && (
-                            <button
-                              className="add-to-playlist-btn"
-                              title="Add to Playlist"
-                              onClick={e => { e.stopPropagation(); openAddToPlaylistModal(song); }}
-                            >
-                              ➕
-                            </button>
-                          )}
-                        </div>
-                        <div style={{ fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)' }}>
-                          {song.artist || 'Unknown Artist'}
+                {songs.map((song, index) => {
+                  // Check if song is in playlist
+                  const inPlaylist = playlistSongs.some(ps => ps.song_id === song.id);
+                  return (
+                    <div
+                      key={song.id}
+                      onClick={() => handleSongSelect(song, index)}
+                      className={`song-list-item${currentSong?.id === song.id ? ' active' : ''}`}
+                      style={styles.songItem}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        {/* Show thumbnail if available, else music note */}
+                        {song.thumbnail ? (
+                          <img src={song.thumbnail} alt="thumb" style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'cover', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }} />
+                        ) : (
+                          <span style={{ width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, background: '#232323', borderRadius: 8, color: '#1db954' }}>🎵</span>
+                        )}
+                        <div>
+                          <div style={{ 
+                            fontWeight: 'bold', 
+                            marginBottom: '5px',
+                            fontSize: 'clamp(0.9rem, 3vw, 1rem)',
+                            display: 'flex', alignItems: 'center', gap: 8
+                          }}>
+                            <span>{song.title || 'Unknown Title'}</span>
+                            {user && playlist && (
+                              inPlaylist ? (
+                                <button
+                                  className="add-to-playlist-btn"
+                                  title="Remove from Playlist"
+                                  onClick={e => { e.stopPropagation();
+                                    // Find the playlistSong id
+                                    const ps = playlistSongs.find(ps => ps.song_id === song.id);
+                                    if (ps) handleRemoveSongFromPlaylist(ps.id);
+                                  }}
+                                  style={{ color: '#fff', background: '#e74c3c', border: 'none', borderRadius: 6, padding: '2px 8px', marginLeft: 4, cursor: 'pointer', fontWeight: 700, fontSize: 15 }}
+                                >
+                                  −
+                                </button>
+                              ) : (
+                                <button
+                                  className="add-to-playlist-btn"
+                                  title="Add to Playlist"
+                                  onClick={e => { e.stopPropagation(); handleAddSongToPlaylist(song); }}
+                                  style={{ color: '#fff', background: '#1db954', border: 'none', borderRadius: 6, padding: '2px 8px', marginLeft: 4, cursor: 'pointer', fontWeight: 700, fontSize: 15 }}
+                                >
+                                  ➕
+                                </button>
+                              )
+                            )}
+                          </div>
+                          <div style={{ fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)' }}>
+                            {song.artist || 'Unknown Artist'}
+                          </div>
                         </div>
                       </div>
+                      <div style={{ textAlign: 'right', fontSize: 'clamp(0.7rem, 2vw, 0.8rem)' }}>
+                        <div>{song.source === 'jiosaavn' ? '🎵' : song.source === 'api' ? '🌐' : '📁'}</div>
+                        {song.duration && <div>{formatTime(song.duration)}</div>}
+                      </div>
                     </div>
-                    <div style={{ textAlign: 'right', fontSize: 'clamp(0.7rem, 2vw, 0.8rem)' }}>
-                      <div>{song.source === 'jiosaavn' ? '🎵' : song.source === 'api' ? '🌐' : '📁'}</div>
-                      {song.duration && <div>{formatTime(song.duration)}</div>}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {isLoading && (
                   <div style={{ padding: '20px', textAlign: 'center' }}>
                     <p>Loading more...</p>

@@ -110,6 +110,10 @@ def register():
         return jsonify({'error': 'User ID already exists'}), 400
     hashed = generate_password_hash(password)
     c.execute('INSERT INTO user (username, user_id, password) VALUES (?, ?, ?)', (username, user_id, hashed))
+    user_db_id = c.lastrowid
+    # Create default playlist for user
+    default_playlist_name = f"{username} - playlist"
+    c.execute('INSERT INTO playlist (name, user_id) VALUES (?, ?)', (default_playlist_name, user_db_id))
     conn.commit()
     conn.close()
     return jsonify({'message': 'Registered successfully'})
@@ -145,22 +149,7 @@ def me():
 @app.route('/playlists', methods=['POST'])
 @login_required
 def create_playlist():
-    data = request.json
-    name = data.get('name')
-    if not name:
-        return jsonify({'error': 'Missing playlist name'}), 400
-    conn = get_db()
-    c = conn.cursor()
-    c.execute('SELECT id FROM user WHERE user_id = ?', (request.user_id,))
-    user_row = c.fetchone()
-    if not user_row:
-        return jsonify({'error': 'User not found'}), 404
-    user_db_id = user_row['id']
-    c.execute('INSERT INTO playlist (name, user_id) VALUES (?, ?)', (name, user_db_id))
-    conn.commit()
-    playlist_id = c.lastrowid
-    conn.close()
-    return jsonify({'id': playlist_id, 'name': name})
+    return jsonify({'error': 'Multiple playlists are not supported. Each user has a default playlist.'}), 400
 
 @app.route('/playlists', methods=['GET'])
 @login_required
@@ -172,8 +161,10 @@ def get_playlists():
     if not user_row:
         return jsonify({'error': 'User not found'}), 404
     user_db_id = user_row['id']
-    c.execute('SELECT id, name FROM playlist WHERE user_id = ?', (user_db_id,))
-    playlists = [{'id': row['id'], 'name': row['name']} for row in c.fetchall()]
+    # Only return the default playlist
+    c.execute('SELECT id, name FROM playlist WHERE user_id = ? LIMIT 1', (user_db_id,))
+    row = c.fetchone()
+    playlists = [{'id': row['id'], 'name': row['name']}] if row else []
     conn.close()
     return jsonify({'playlists': playlists})
 
@@ -187,10 +178,12 @@ def add_song_to_playlist(playlist_id):
         return jsonify({'error': 'Missing song_id or song_title'}), 400
     conn = get_db()
     c = conn.cursor()
-    # Check playlist ownership
-    c.execute('SELECT p.id FROM playlist p JOIN user u ON p.user_id = u.id WHERE p.id = ? AND u.user_id = ?', (playlist_id, request.user_id))
-    if not c.fetchone():
-        return jsonify({'error': 'Playlist not found or not owned by user'}), 404
+    # Find user's default playlist
+    c.execute('SELECT p.id FROM playlist p JOIN user u ON p.user_id = u.id WHERE u.user_id = ? LIMIT 1', (request.user_id,))
+    row = c.fetchone()
+    if not row:
+        return jsonify({'error': 'Default playlist not found for user'}), 404
+    playlist_id = row['id']
     c.execute('INSERT INTO playlistsong (playlist_id, song_id, song_title) VALUES (?, ?, ?)', (playlist_id, song_id, song_title))
     conn.commit()
     conn.close()
@@ -201,10 +194,12 @@ def add_song_to_playlist(playlist_id):
 def get_playlist_songs(playlist_id):
     conn = get_db()
     c = conn.cursor()
-    # Check playlist ownership
-    c.execute('SELECT p.id FROM playlist p JOIN user u ON p.user_id = u.id WHERE p.id = ? AND u.user_id = ?', (playlist_id, request.user_id))
-    if not c.fetchone():
-        return jsonify({'error': 'Playlist not found or not owned by user'}), 404
+    # Find user's default playlist
+    c.execute('SELECT p.id FROM playlist p JOIN user u ON p.user_id = u.id WHERE u.user_id = ? LIMIT 1', (request.user_id,))
+    row = c.fetchone()
+    if not row:
+        return jsonify({'error': 'Default playlist not found for user'}), 404
+    playlist_id = row['id']
     c.execute('SELECT id, song_id, song_title FROM playlistsong WHERE playlist_id = ?', (playlist_id,))
     songs = [{'id': row['id'], 'song_id': row['song_id'], 'song_title': row['song_title']} for row in c.fetchall()]
     conn.close()
@@ -215,10 +210,12 @@ def get_playlist_songs(playlist_id):
 def remove_song_from_playlist(playlist_id, song_db_id):
     conn = get_db()
     c = conn.cursor()
-    # Check playlist ownership
-    c.execute('SELECT p.id FROM playlist p JOIN user u ON p.user_id = u.id WHERE p.id = ? AND u.user_id = ?', (playlist_id, request.user_id))
-    if not c.fetchone():
-        return jsonify({'error': 'Playlist not found or not owned by user'}), 404
+    # Find user's default playlist
+    c.execute('SELECT p.id FROM playlist p JOIN user u ON p.user_id = u.id WHERE u.user_id = ? LIMIT 1', (request.user_id,))
+    row = c.fetchone()
+    if not row:
+        return jsonify({'error': 'Default playlist not found for user'}), 404
+    playlist_id = row['id']
     c.execute('DELETE FROM playlistsong WHERE id = ? AND playlist_id = ?', (song_db_id, playlist_id))
     conn.commit()
     conn.close()
