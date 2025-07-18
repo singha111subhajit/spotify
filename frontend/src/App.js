@@ -444,13 +444,11 @@ function App() {
   */
 
   // Volume control
-  /*
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = isMuted ? 0 : volume;
     }
   }, [volume, isMuted]);
-  */
 
   // Keyboard shortcuts
   /*
@@ -840,7 +838,6 @@ function App() {
   };
 
   // --- Auth Functions ---
-  /*
   useEffect(() => {
     if (jwt) {
       axios.get(`${API_BASE}/me`, { headers: { Authorization: `Bearer ${jwt}` } })
@@ -850,7 +847,6 @@ function App() {
       setUser(null);
     }
   }, [jwt]);
-  */
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -940,14 +936,12 @@ function App() {
   };
 
   // Fetch playlist when sidebar opens
-  /*
   useEffect(() => { 
     if (playlistSidebarOpen) {
       console.log('[DEBUG] useEffect: playlistSidebarOpen is true, calling fetchPlaylistAndSongs');
       fetchPlaylistAndSongs();
     }
   }, [playlistSidebarOpen, jwt]);
-  */
 
   if (error) {
     return (
