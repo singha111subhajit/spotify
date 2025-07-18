@@ -384,6 +384,7 @@ function App() {
   }, [isPlaying]);
 
   // Audio event handlers
+  /*
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -446,6 +447,7 @@ function App() {
       audio.removeEventListener('seeked', onSeeked);
     };
   }, [currentSong, handleNext, repeatMode, isShuffled, currentIndex, songs.length]);
+  */
 
   // Auto-preload songs when getting close to the end for seamless playback
   /*
