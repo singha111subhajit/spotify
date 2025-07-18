@@ -448,6 +448,7 @@ function App() {
   }, [currentSong, handleNext, repeatMode, isShuffled, currentIndex, songs.length]);
 
   // Auto-preload songs when getting close to the end for seamless playback
+  /*
   useEffect(() => {
     // Only preload if we're not in shuffle mode and not currently loading
     if (!isShuffled && !isLoading && (hasMore || onlineHasMore) && songs.length > 0) {
@@ -461,6 +462,7 @@ function App() {
       }
     }
   }, [currentIndex, songs.length, isShuffled, isLoading, hasMore, onlineHasMore, loadMoreSongsAutomatically]);
+  */
 
   // Volume control
   useEffect(() => {
