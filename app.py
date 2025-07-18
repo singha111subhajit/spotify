@@ -570,7 +570,6 @@ def api_songs():
 
 @app.route('/api/search')
 def api_search():
-    """Search for songs using static files and JioSaavn API"""
     try:
         query = request.args.get('q', '')
         page = request.args.get('page', 1, type=int)
@@ -586,7 +585,11 @@ def api_search():
         ]
         print(f"Found {len(matching_static)} matching static songs")
         # Search JioSaavn API
-        jiosaavn_songs, total_found = search_jiosaavn(query, page, per_page)
+        try:
+            jiosaavn_songs, total_found = search_jiosaavn(query, page, per_page)
+        except Exception as e:
+            print(f'JioSaavn search failed: {e}')
+            jiosaavn_songs, total_found = [], 0
         print(f"Found {len(jiosaavn_songs)} JioSaavn songs")
         # Combine results (static songs first)
         # Ensure all external URLs are HTTPS in the response
