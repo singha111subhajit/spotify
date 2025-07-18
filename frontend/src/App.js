@@ -1324,6 +1324,7 @@ function App() {
                 {currentSong.year && ` • ${currentSong.year}`}
               </div>
 
+              {/*
               <audio
                 key={currentSong?.id || currentSong?.url}
                 ref={audioRef}
@@ -1334,6 +1335,7 @@ function App() {
                   console.log('Failed URL:', currentSong.url);
                 }}
               />
+              */}
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '50px' }}>
