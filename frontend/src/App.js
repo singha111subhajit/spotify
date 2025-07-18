@@ -393,19 +393,20 @@ function App() {
     const updateDuration = () => setDuration(audio.duration);
     const onEnded = async () => {
       // Only advance if not at the end of the list
+      // Comment out all state updates to test for render loop
+      /*
       if (repeatMode === 'one') {
         audio.currentTime = 0;
         audio.play();
       } else if (isShuffled) {
-        // Only update index, not song state
         const nextIndex = Math.floor(Math.random() * songs.length);
         setCurrentIndex(nextIndex);
       } else if (currentIndex + 1 < songs.length) {
         setCurrentIndex(currentIndex + 1);
       } else {
-        // End of playlist, stop playback
         setIsPlaying(false);
       }
+      */
     };
     const onSeeked = () => setCurrentTime(audio.currentTime);
     audio.addEventListener('timeupdate', updateTime);
