@@ -65,6 +65,14 @@ function App() {
   const [jwt, setJwt] = useState(() => localStorage.getItem('jwt') || '');
   const [user, setUser] = useState(null);
   const [playlistSidebarOpen, setPlaylistSidebarOpen] = useState(false);
+  // Debug print for sidebar open state
+  useEffect(() => {
+    console.log('[DEBUG] playlistSidebarOpen changed:', playlistSidebarOpen);
+  }, [playlistSidebarOpen]);
+  // Debug print for isPlaying
+  useEffect(() => {
+    console.log('[DEBUG] isPlaying changed:', isPlaying);
+  }, [isPlaying]);
   const [playlist, setPlaylist] = useState(null); // Only one playlist per user
   const [playlistSongs, setPlaylistSongs] = useState([]);
   const [playlistLoading, setPlaylistLoading] = useState(false);
@@ -888,6 +896,7 @@ function App() {
   // --- Playlist Functions ---
   // Fetch default playlist and its songs
   const fetchPlaylistAndSongs = async () => {
+    console.log('[DEBUG] fetchPlaylistAndSongs called');
     if (!jwt) return;
     setPlaylistLoading(true);
     setPlaylistError('');
@@ -939,7 +948,12 @@ function App() {
   };
 
   // Fetch playlist when sidebar opens
-  useEffect(() => { if (playlistSidebarOpen) fetchPlaylistAndSongs(); }, [playlistSidebarOpen, jwt]);
+  useEffect(() => { 
+    if (playlistSidebarOpen) {
+      console.log('[DEBUG] useEffect: playlistSidebarOpen is true, calling fetchPlaylistAndSongs');
+      fetchPlaylistAndSongs();
+    }
+  }, [playlistSidebarOpen, jwt]);
 
   if (error) {
     return (
