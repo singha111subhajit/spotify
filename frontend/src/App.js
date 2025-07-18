@@ -355,7 +355,6 @@ function App() {
 
   // --- useEffect hooks ---
   // Auto-play when song changes (only reload audio if song changes)
-  /*
   useEffect(() => {
     if (currentSong && audioRef.current) {
       audioRef.current.pause();
@@ -372,10 +371,8 @@ function App() {
     }
     // eslint-disable-next-line
   }, [currentSong]);
-  */
 
   // Play/pause effect (do not reload audio)
-  /*
   useEffect(() => {
     if (!audioRef.current) return;
     if (isPlaying) {
@@ -387,10 +384,8 @@ function App() {
       audioRef.current.pause();
     }
   }, [isPlaying]);
-  */
 
   // Audio event handlers
-  /*
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -424,24 +419,6 @@ function App() {
       audio.removeEventListener('seeked', onSeeked);
     };
   }, [currentSong, repeatMode, isShuffled, currentIndex, songs.length]);
-  */
-
-  // Auto-preload songs when getting close to the end for seamless playback
-  /*
-  useEffect(() => {
-    // Only preload if we're not in shuffle mode and not currently loading
-    if (!isShuffled && !isLoading && (hasMore || onlineHasMore) && songs.length > 0) {
-      // Check if current song is close to the end of the list
-      const songsRemaining = songs.length - currentIndex;
-      
-      // Preload when 3 or fewer songs remaining
-      if (songsRemaining <= 3) {
-        console.log(`Preloading more songs: ${songsRemaining} songs remaining`);
-        loadMoreSongsAutomatically();
-      }
-    }
-  }, [currentIndex, songs.length, isShuffled, isLoading, hasMore, onlineHasMore, loadMoreSongsAutomatically]);
-  */
 
   // Volume control
   useEffect(() => {
