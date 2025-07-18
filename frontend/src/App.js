@@ -422,10 +422,12 @@ function App() {
       }
     };
     const onPlay = () => {
-      setIsPlaying(true);
+      // setIsPlaying(true); // REMOVE to prevent feedback loop
       setCurrentTime(audio.currentTime);
     };
-    const onPause = () => setIsPlaying(false);
+    const onPause = () => {
+      // setIsPlaying(false); // REMOVE to prevent feedback loop
+    };
     const onSeeked = () => setCurrentTime(audio.currentTime);
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
