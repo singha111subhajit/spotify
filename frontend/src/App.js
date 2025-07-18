@@ -21,6 +21,7 @@ function useDarkMode() {
 }
 
 function App() {
+  console.log('[DEBUG] App rendered');
   const [theme, setTheme] = useDarkMode();
   // Core state
   const [songs, setSongs] = useState([]);
