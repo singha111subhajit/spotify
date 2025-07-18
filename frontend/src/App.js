@@ -385,39 +385,6 @@ function App() {
     }
   }, [isPlaying]);
 
-  // Restore audio event handlers (progress, onEnded, seeked)
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const updateTime = () => setCurrentTime(audio.currentTime);
-    const updateDuration = () => setDuration(audio.duration);
-    const onEnded = () => {
-      // Only advance if not at the end of the list
-      if (repeatMode === 'one') {
-        audio.currentTime = 0;
-        audio.play();
-      } else if (isShuffled) {
-        const nextIndex = Math.floor(Math.random() * songs.length);
-        if (nextIndex !== currentIndex) setCurrentIndex(nextIndex);
-      } else if (currentIndex + 1 < songs.length) {
-        setCurrentIndex(currentIndex + 1);
-      } else {
-        setIsPlaying(false);
-      }
-    };
-    const onSeeked = () => setCurrentTime(audio.currentTime);
-    audio.addEventListener('timeupdate', updateTime);
-    audio.addEventListener('loadedmetadata', updateDuration);
-    audio.addEventListener('ended', onEnded);
-    audio.addEventListener('seeked', onSeeked);
-    return () => {
-      audio.removeEventListener('timeupdate', updateTime);
-      audio.removeEventListener('loadedmetadata', updateDuration);
-      audio.removeEventListener('ended', onEnded);
-      audio.removeEventListener('seeked', onSeeked);
-    };
-  }, [currentSong, repeatMode, isShuffled, currentIndex, songs.length]);
-
   // Restore user fetch on jwt change
   useEffect(() => {
     if (jwt) {
@@ -1306,11 +1273,28 @@ function App() {
 
               <audio
                 ref={audioRef}
-                src={currentSong.url}
+                src={currentSong?.url}
                 preload="metadata"
                 onError={(e) => {
                   console.error('Audio error:', e);
                   console.log('Failed URL:', currentSong.url);
+                }}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onTimeUpdate={e => setCurrentTime(e.target.currentTime)}
+                onLoadedMetadata={e => setDuration(e.target.duration)}
+                onEnded={() => {
+                  if (repeatMode === 'one') {
+                    audioRef.current.currentTime = 0;
+                    audioRef.current.play();
+                  } else if (isShuffled) {
+                    const nextIndex = Math.floor(Math.random() * songs.length);
+                    if (nextIndex !== currentIndex) setCurrentIndex(nextIndex);
+                  } else if (currentIndex + 1 < songs.length) {
+                    setCurrentIndex(currentIndex + 1);
+                  } else {
+                    setIsPlaying(false);
+                  }
                 }}
               />
             </>
