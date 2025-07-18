@@ -355,6 +355,8 @@ function App() {
 
   // --- useEffect hooks ---
   // Auto-play when song changes (only reload audio if song changes)
+  // Comment out all useEffects except volume control
+  /*
   useEffect(() => {
     if (currentSong && audioRef.current) {
       audioRef.current.pause();
@@ -372,7 +374,6 @@ function App() {
     // eslint-disable-next-line
   }, [currentSong]);
 
-  // Play/pause effect (do not reload audio)
   useEffect(() => {
     if (!audioRef.current) return;
     if (isPlaying) {
@@ -385,13 +386,11 @@ function App() {
     }
   }, [isPlaying]);
 
-  // Audio event handlers
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     const updateTime = () => setCurrentTime(audio.currentTime);
     const updateDuration = () => setDuration(audio.duration);
-    // Comment out onEnded entirely for now
     // const onEnded = async () => {};
     const onSeeked = () => setCurrentTime(audio.currentTime);
     audio.addEventListener('timeupdate', updateTime);
@@ -405,6 +404,24 @@ function App() {
       audio.removeEventListener('seeked', onSeeked);
     };
   }, [currentSong, repeatMode, isShuffled, currentIndex, songs.length]);
+
+  useEffect(() => {
+    if (jwt) {
+      axios.get(`${API_BASE}/me`, { headers: { Authorization: `Bearer ${jwt}` } })
+        .then(res => setUser(res.data))
+        .catch(() => { setUser(null); setJwt(''); localStorage.removeItem('jwt'); });
+    } else {
+      setUser(null);
+    }
+  }, [jwt]);
+
+  useEffect(() => { 
+    if (playlistSidebarOpen) {
+      console.log('[DEBUG] useEffect: playlistSidebarOpen is true, calling fetchPlaylistAndSongs');
+      fetchPlaylistAndSongs();
+    }
+  }, [playlistSidebarOpen, jwt]);
+  */
 
   // Volume control
   useEffect(() => {
