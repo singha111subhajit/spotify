@@ -996,7 +996,10 @@ function App() {
     return (
       <div className="playlist-sidebar-backdrop" onClick={() => setPlaylistSidebarOpen(false)}>
         <div className="playlist-sidebar" onClick={e => e.stopPropagation()}>
-          <h2 style={{marginBottom: 8}}>My Playlist</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <h2 style={{ margin: 0 }}>My Playlist</h2>
+            <button onClick={() => setPlaylistSidebarOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', marginLeft: 8 }} title="Close">✖</button>
+          </div>
           {playlistError && <div style={{ color: 'red', marginBottom: 8 }}>{playlistError}</div>}
           {playlistLoading ? <div>Loading...</div> : !playlist ? <div>No playlist found</div> : (
             <>
