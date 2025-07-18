@@ -1006,13 +1006,17 @@ function App() {
   );
 
   // Playlist Sidebar (function component, not affected by player state)
-  const PlaylistSidebar = React.memo(function PlaylistSidebar() {
+  const PlaylistSidebar = React.memo(function PlaylistSidebar({ open, onClose }) {
     return (
-      <div className="playlist-sidebar-backdrop" onClick={() => setPlaylistSidebarOpen(false)}>
+      <div
+        className="playlist-sidebar-backdrop"
+        style={{ display: open ? 'block' : 'none' }}
+        onClick={onClose}
+      >
         <div className="playlist-sidebar" onClick={e => e.stopPropagation()}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <h2 style={{ margin: 0 }}>My Playlist</h2>
-            <button onClick={() => setPlaylistSidebarOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', marginLeft: 8 }} title="Close">✖</button>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', marginLeft: 8 }} title="Close">✖</button>
           </div>
           {playlistError && <div style={{ color: 'red', marginBottom: 8 }}>{playlistError}</div>}
           {playlistLoading ? <div>Loading...</div> : !playlist ? <div>No playlist found</div> : (
@@ -1080,7 +1084,7 @@ function App() {
           </p>
         </header>
         {authModalOpen && <AuthModal />}
-        {playlistSidebarOpen ? <PlaylistSidebar /> : null}
+        <PlaylistSidebar open={playlistSidebarOpen} onClose={() => setPlaylistSidebarOpen(false)} />
         {/* No add-to-playlist modal needed for single playlist */}
         {toast && <div className="toast">{toast}</div>}
 
