@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import './App.css';
 
@@ -20,10 +20,7 @@ function useDarkMode() {
   return [theme, setTheme];
 }
 
-let renderCount = 0;
 function App() {
-  renderCount += 1;
-  console.log('[DEBUG] App rendered', renderCount);
   const [theme, setTheme] = useDarkMode();
   // Core state
   const [songs, setSongs] = useState([]);
@@ -637,8 +634,8 @@ function App() {
     return baseStyle;
   };
 
-  // Styles with mobile responsiveness
-  const styles = {
+  // Styles with mobile responsiveness - memoized to prevent re-renders
+  const styles = useMemo(() => ({
     container: getContainerStyle(),
     content: {
       maxWidth: '1200px',
@@ -826,7 +823,7 @@ function App() {
       backgroundColor: 'var(--spotify-green)',
       color: '#fff'
     }
-  };
+  }), [currentSong, isPlaying]); // Memoize based on dependencies that affect styles
 
   // --- Auth Functions ---
   useEffect(() => {
