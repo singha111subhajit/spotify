@@ -20,10 +20,8 @@ function useDarkMode() {
   return [theme, setTheme];
 }
 
-let renderCount = 0;
 function App() {
-  renderCount += 1;
-  console.log('[DEBUG] App rendered', renderCount);
+  console.log('App component rendered');
   const [theme, setTheme] = useDarkMode();
   // Core state
   const [songs, setSongs] = useState([]);
@@ -68,16 +66,6 @@ function App() {
   const [jwt, setJwt] = useState(() => localStorage.getItem('jwt') || '');
   const [user, setUser] = useState(null);
   const [playlistSidebarOpen, setPlaylistSidebarOpen] = useState(false);
-  // Debug print for sidebar open state
-  /*
-  useEffect(() => {
-    console.log('[DEBUG] playlistSidebarOpen changed:', playlistSidebarOpen);
-  }, [playlistSidebarOpen]);
-  // Debug print for isPlaying
-  useEffect(() => {
-    console.log('[DEBUG] isPlaying changed:', isPlaying);
-  }, [isPlaying]);
-  */
   const [playlist, setPlaylist] = useState(null); // Only one playlist per user
   const [playlistSongs, setPlaylistSongs] = useState([]);
   const [playlistLoading, setPlaylistLoading] = useState(false);
@@ -355,8 +343,6 @@ function App() {
 
   // --- useEffect hooks ---
   // Auto-play when song changes (only reload audio if song changes)
-  // Comment out all useEffects except volume control
-  /*
   useEffect(() => {
     if (currentSong && audioRef.current) {
       audioRef.current.pause();
@@ -374,6 +360,7 @@ function App() {
     // eslint-disable-next-line
   }, [currentSong]);
 
+  // Play/pause effect (do not reload audio)
   useEffect(() => {
     if (!audioRef.current) return;
     if (isPlaying) {
@@ -386,42 +373,115 @@ function App() {
     }
   }, [isPlaying]);
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Audio event handlers
+  
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const updateTime = () => setCurrentTime(audio.currentTime);
+    const updateTime = () => {
+      setCurrentTime(audio.currentTime);
+      // console.log('audio.currentTime:', audio.currentTime);
+    };
     const updateDuration = () => setDuration(audio.duration);
-    // const onEnded = async () => {};
+    const onEnded = async () => {
+      // Only advance if not at the end of the list
+      if (repeatMode === 'one') {
+        audio.currentTime = 0;
+        audio.play();
+      } else if (isShuffled) {
+        handleNext();
+      } else if (currentIndex + 1 < songs.length) {
+        handleNext();
+      } else if (hasMore) {
+        // At end, but more songs can be loaded: load more and continue
+        setIsLoading(true);
+        let prevSongsLen = songs.length;
+        if (mode === 'local') {
+          await fetchMoreRandom();
+        } else if (mode === 'online') {
+          await fetchMoreOnline(false, onlinePage + 1);
+        }
+        setIsLoading(false);
+        // If new songs loaded, play the next one
+        if (songs.length > prevSongsLen) {
+          setCurrentIndex(prevSongsLen);
+          setCurrentSong(songs[prevSongsLen]);
+          setIsPlaying(true);
+        } else {
+          setIsPlaying(false); // No more songs loaded
+        }
+      } else {
+        setIsPlaying(false); // Stop playback at end
+      }
+    };
+    const onPlay = () => {
+      setIsPlaying(true);
+      setCurrentTime(audio.currentTime);
+    };
+    const onPause = () => setIsPlaying(false);
     const onSeeked = () => setCurrentTime(audio.currentTime);
-    audio.addEventListener('timeupdate', updateTime);
+    // audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
-    // audio.addEventListener('ended', onEnded);
+    audio.addEventListener('ended', onEnded);
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('pause', onPause);
     audio.addEventListener('seeked', onSeeked);
     return () => {
-      audio.removeEventListener('timeupdate', updateTime);
+      // audio.removeEventListener('timeupdate', updateTime);
       audio.removeEventListener('loadedmetadata', updateDuration);
-      // audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('pause', onPause);
       audio.removeEventListener('seeked', onSeeked);
     };
-  }, [currentSong, repeatMode, isShuffled, currentIndex, songs.length]);
+  }, [currentSong, handleNext, repeatMode, isShuffled, currentIndex, songs.length]);
+  
 
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+
+  // Auto-preload songs when getting close to the end for seamless playback
   useEffect(() => {
-    if (jwt) {
-      axios.get(`${API_BASE}/me`, { headers: { Authorization: `Bearer ${jwt}` } })
-        .then(res => setUser(res.data))
-        .catch(() => { setUser(null); setJwt(''); localStorage.removeItem('jwt'); });
-    } else {
-      setUser(null);
+    // Only preload if we're not in shuffle mode and not currently loading
+    if (!isShuffled && !isLoading && (hasMore || onlineHasMore) && songs.length > 0) {
+      // Check if current song is close to the end of the list
+      const songsRemaining = songs.length - currentIndex;
+      
+      // Preload when 3 or fewer songs remaining
+      if (songsRemaining <= 3) {
+        console.log(`Preloading more songs: ${songsRemaining} songs remaining`);
+        loadMoreSongsAutomatically();
+      }
     }
-  }, [jwt]);
-
-  useEffect(() => { 
-    if (playlistSidebarOpen) {
-      console.log('[DEBUG] useEffect: playlistSidebarOpen is true, calling fetchPlaylistAndSongs');
-      fetchPlaylistAndSongs();
-    }
-  }, [playlistSidebarOpen, jwt]);
-  */
+  }, [currentIndex, songs.length, isShuffled, isLoading, hasMore, onlineHasMore, loadMoreSongsAutomatically]);
 
   // Volume control
   useEffect(() => {
@@ -431,7 +491,6 @@ function App() {
   }, [volume, isMuted]);
 
   // Keyboard shortcuts
-  /*
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (e.target.tagName === 'INPUT') return;
@@ -470,7 +529,6 @@ function App() {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, []);
-  */
 
   // Player controls
   // ...existing code...
@@ -864,7 +922,6 @@ function App() {
   // --- Playlist Functions ---
   // Fetch default playlist and its songs
   const fetchPlaylistAndSongs = async () => {
-    console.log('[DEBUG] fetchPlaylistAndSongs called');
     if (!jwt) return;
     setPlaylistLoading(true);
     setPlaylistError('');
@@ -916,12 +973,7 @@ function App() {
   };
 
   // Fetch playlist when sidebar opens
-  useEffect(() => { 
-    if (playlistSidebarOpen) {
-      console.log('[DEBUG] useEffect: playlistSidebarOpen is true, calling fetchPlaylistAndSongs');
-      fetchPlaylistAndSongs();
-    }
-  }, [playlistSidebarOpen, jwt]);
+  useEffect(() => { if (playlistSidebarOpen) fetchPlaylistAndSongs(); }, [playlistSidebarOpen, jwt]);
 
   if (error) {
     return (
@@ -974,17 +1026,13 @@ function App() {
   );
 
   // Playlist Sidebar (function component, not affected by player state)
-  const PlaylistSidebar = React.memo(function PlaylistSidebar({ open, onClose }) {
+  const PlaylistSidebar = React.memo(function PlaylistSidebar() {
     return (
-      <div
-        className="playlist-sidebar-backdrop"
-        style={{ display: open ? 'block' : 'none' }}
-        onClick={onClose}
-      >
+      <div className="playlist-sidebar-backdrop" onClick={() => setPlaylistSidebarOpen(false)}>
         <div className="playlist-sidebar" onClick={e => e.stopPropagation()}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <h2 style={{ margin: 0 }}>My Playlist</h2>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', marginLeft: 8 }} title="Close">✖</button>
+            <button onClick={() => setPlaylistSidebarOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', marginLeft: 8 }} title="Close">✖</button>
           </div>
           {playlistError && <div style={{ color: 'red', marginBottom: 8 }}>{playlistError}</div>}
           {playlistLoading ? <div>Loading...</div> : !playlist ? <div>No playlist found</div> : (
@@ -1052,7 +1100,7 @@ function App() {
           </p>
         </header>
         {authModalOpen && <AuthModal />}
-        <PlaylistSidebar open={playlistSidebarOpen} onClose={() => setPlaylistSidebarOpen(false)} />
+        {playlistSidebarOpen ? <PlaylistSidebar /> : null}
         {/* No add-to-playlist modal needed for single playlist */}
         {toast && <div className="toast">{toast}</div>}
 
@@ -1292,6 +1340,7 @@ function App() {
               </div>
 
               <audio
+                key={currentSong?.id || currentSong?.url}
                 ref={audioRef}
                 src={currentSong.url}
                 preload="metadata"
