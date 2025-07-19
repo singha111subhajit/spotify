@@ -399,6 +399,16 @@ function App() {
 
 
 
+  // Debug: Monitor isPlaying state changes
+  useEffect(() => {
+    console.log('isPlaying state changed to:', isPlaying);
+  }, [isPlaying]);
+
+  // Debug: Monitor currentTime changes
+  useEffect(() => {
+    console.log('currentTime changed to:', currentTime);
+  }, [currentTime]);
+
   // Restore user fetch on jwt change
   useEffect(() => {
     if (jwt) {
@@ -490,6 +500,15 @@ function App() {
       if (response.data.songs.length > 0 && !currentSong) {
         setCurrentSong(response.data.songs[0]);
         setCurrentIndex(0);
+        // Start playing the first search result
+        setTimeout(() => {
+          if (audioRef.current) {
+            audioRef.current.play().catch(error => {
+              console.error('Playback failed:', error);
+              setIsPlaying(false);
+            });
+          }
+        }, 100);
       }
       // Update current index if current song is in new results
       if (currentSong) {
@@ -1135,7 +1154,15 @@ function App() {
                         setSuggestions([]); // Hide dropdown until new input
                         setCurrentSong(s);
                         setCurrentIndex(0);
-                        setIsPlaying(true);
+                        // Start playing the selected song
+                        setTimeout(() => {
+                          if (audioRef.current) {
+                            audioRef.current.play().catch(error => {
+                              console.error('Playback failed:', error);
+                              setIsPlaying(false);
+                            });
+                          }
+                        }, 100);
                       }}
                       onMouseEnter={() => setActiveSuggestion(i)}
                     >
@@ -1293,9 +1320,18 @@ function App() {
                   console.error('Audio error:', e);
                   console.log('Failed URL:', currentSong.url);
                 }}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onTimeUpdate={e => setCurrentTime(e.target.currentTime)}
+                onPlay={() => {
+                  console.log('Audio onPlay event fired');
+                  setIsPlaying(true);
+                }}
+                onPause={() => {
+                  console.log('Audio onPause event fired');
+                  setIsPlaying(false);
+                }}
+                onTimeUpdate={e => {
+                  console.log('Audio onTimeUpdate:', e.target.currentTime);
+                  setCurrentTime(e.target.currentTime);
+                }}
                 onLoadedMetadata={e => setDuration(e.target.duration)}
                 onEnded={() => {
                   if (repeatMode === 'one') {
