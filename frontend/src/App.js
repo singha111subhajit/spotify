@@ -154,6 +154,8 @@ function App() {
     }
   }, [onlineQuery, currentSong]);
 
+  // Temporarily disabled to isolate render loop
+  /*
   useEffect(() => {
     // On mount, try to load random online songs first
     const shuffleArray = (array) => {
@@ -196,6 +198,7 @@ function App() {
     };
     loadInitialSongs();
   }, []);
+  */
 
   // --- Player controls (move these above useEffect hooks) ---
   const togglePlayPause = useCallback(() => {
@@ -389,6 +392,8 @@ function App() {
   }, [setTheme]);
 
   // --- useEffect hooks ---
+  // Temporarily disabled to isolate render loop
+  /*
   // Handle song changes
   useEffect(() => {
     if (currentSong && audioRef.current) {
@@ -401,6 +406,7 @@ function App() {
     }
     // eslint-disable-next-line
   }, [currentSong]);
+  */
 
 
 
@@ -611,30 +617,15 @@ function App() {
     }
   };
 
-  // Get background style with song image - memoized to prevent re-renders
-  const getContainerStyle = useMemo(() => {
-    const baseStyle = {
-      minHeight: '100vh',
-      background: 'var(--bg-main)',
-      color: 'var(--text-main)',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      transition: 'background 0.3s, color 0.3s',
-      position: 'relative'
-    };
-
-    // Add background image if song has thumbnail
-    if (currentSong && currentSong.thumbnail && isPlaying) {
-      return {
-        ...baseStyle,
-        backgroundImage: `linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.8)), url(${currentSong.thumbnail})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed'
-      };
-    }
-
-    return baseStyle;
-  }, [currentSong, isPlaying]);
+  // Get background style with song image - simplified to prevent loops
+  const getContainerStyle = useMemo(() => ({
+    minHeight: '100vh',
+    background: 'var(--bg-main)',
+    color: 'var(--text-main)',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    transition: 'background 0.3s, color 0.3s',
+    position: 'relative'
+  }), []);
 
   // Styles with mobile responsiveness - memoized to prevent re-renders
   const styles = useMemo(() => ({
@@ -697,22 +688,19 @@ function App() {
       padding: 'clamp(20px, 4vw, 30px)', // Responsive padding
       marginBottom: '30px',
       border: '1px solid var(--border-main)',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.3)', // Enhanced shadow for background images
-      backdropFilter: currentSong && currentSong.thumbnail ? 'blur(10px)' : 'none'
+      boxShadow: '0 8px 32px rgba(0,0,0,0.3)' // Simplified shadow
     },
     albumArt: {
       width: 'clamp(100px, 20vw, 120px)', // Responsive size
       height: 'clamp(100px, 20vw, 120px)',
       borderRadius: '15px',
-      background: currentSong && currentSong.thumbnail 
-        ? `url(${currentSong.thumbnail}) center/cover` 
-        : 'var(--spotify-gray)',
+      background: 'var(--spotify-gray)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       fontSize: '3rem',
       margin: '0 auto 20px',
-      color: currentSong && currentSong.thumbnail ? 'transparent' : 'var(--spotify-green)',
+      color: 'var(--spotify-green)',
       boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
     },
     songTitle: {
@@ -924,12 +912,15 @@ function App() {
     }
   };
 
+  // Temporarily disabled to isolate render loop
+  /*
   // Fetch playlist when sidebar opens
   useEffect(() => { 
     if (playlistSidebarOpen) {
       fetchPlaylistAndSongs();
     }
   }, [playlistSidebarOpen, fetchPlaylistAndSongs]);
+  */
 
   if (error) {
     return (
