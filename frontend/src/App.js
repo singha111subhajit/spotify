@@ -380,16 +380,16 @@ function App() {
 
   // --- useEffect hooks ---
   // Re-enabled with simplified logic
-  useEffect(() => {
-    if (currentSong && audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = currentSong.url;
-      audioRef.current.load();
-      setCurrentTime(0);
-      setDuration(0);
-      setIsPlaying(false);
-    }
-  }, [currentSong]);
+  // useEffect(() => {
+  //   if (currentSong && audioRef.current) {
+  //     audioRef.current.pause();
+  //     audioRef.current.src = currentSong.url;
+  //     audioRef.current.load();
+  //     setCurrentTime(0);
+  //     setDuration(0);
+  //     setIsPlaying(false);
+  //   }
+  // }, [currentSong]);
 
 
 
