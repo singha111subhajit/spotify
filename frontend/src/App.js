@@ -388,26 +388,6 @@ function App() {
 
   
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const updateTime = () => setCurrentTime(audio.currentTime);
-    const updateDuration = () => setDuration(audio.duration);
-    const onEnded = async () => {};
-    const onSeeked = () => setCurrentTime(audio.currentTime);
-    audio.addEventListener('timeupdate', updateTime);
-    audio.addEventListener('loadedmetadata', updateDuration);
-    audio.addEventListener('ended', onEnded);
-    audio.addEventListener('seeked', onSeeked);
-    return () => {
-      audio.removeEventListener('timeupdate', updateTime);
-      audio.removeEventListener('loadedmetadata', updateDuration);
-      audio.removeEventListener('ended', onEnded);
-      audio.removeEventListener('seeked', onSeeked);
-    };
-  }, [currentSong, repeatMode, isShuffled, currentIndex, songs.length]);
-  
- 
-  useEffect(() => {
     if (jwt) {
       axios.get(`${API_BASE}/me`, { headers: { Authorization: `Bearer ${jwt}` } })
         .then(res => setUser(res.data))
@@ -1301,6 +1281,21 @@ function App() {
                   console.error('Audio error:', e);
                   console.log('Failed URL:', currentSong.url);
                 }}
+                onTimeUpdate={() => setCurrentTime(audioRef.current.currentTime)}
+                onLoadedMetadata={() => setDuration(audioRef.current.duration)}
+                onEnded={() => {
+                  setIsPlaying(false);
+                  if (repeatMode === 'one') {
+                    setCurrentIndex(currentIndex); // Repeat current song
+                  } else if (isShuffled) {
+                    setCurrentIndex(Math.floor(Math.random() * songs.length));
+                  } else {
+                    setCurrentIndex(currentIndex + 1);
+                  }
+                  setCurrentSong(songs[currentIndex]);
+                  setIsPlaying(true);
+                }}
+                onSeeked={() => setCurrentTime(audioRef.current.currentTime)}
               />
             </>
           ) : (
