@@ -612,17 +612,17 @@ function App() {
   };
 
   // Get background style with song image - simplified to prevent loops
-  const getContainerStyle = useMemo(() => ({
+  const getContainerStyle = {
     minHeight: '100vh',
     background: 'var(--bg-main)',
     color: 'var(--text-main)',
     fontFamily: 'system-ui, -apple-system, sans-serif',
     transition: 'background 0.3s, color 0.3s',
     position: 'relative'
-  }), []);
+  };
 
   // Styles with mobile responsiveness - memoized to prevent re-renders
-  const styles = useMemo(() => ({
+  const styles = {
     container: getContainerStyle,
     content: {
       maxWidth: '1200px',
@@ -807,7 +807,7 @@ function App() {
       backgroundColor: 'var(--spotify-green)',
       color: '#fff'
     }
-  }), [getContainerStyle]); // Memoize based on the memoized container style
+  };
 
   // --- Auth Functions ---
   useEffect(() => {
