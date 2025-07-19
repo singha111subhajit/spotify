@@ -12,7 +12,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from functools import wraps
 
-app = Flask(__name__, static_folder='static', template_folder='templates')
+app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
 
 # Configuration
@@ -570,6 +570,7 @@ def api_songs():
 
 @app.route('/api/search')
 def api_search():
+    """Search for songs using static files and JioSaavn API"""
     try:
         query = request.args.get('q', '')
         page = request.args.get('page', 1, type=int)
@@ -585,11 +586,7 @@ def api_search():
         ]
         print(f"Found {len(matching_static)} matching static songs")
         # Search JioSaavn API
-        try:
-            jiosaavn_songs, total_found = search_jiosaavn(query, page, per_page)
-        except Exception as e:
-            print(f'JioSaavn search failed: {e}')
-            jiosaavn_songs, total_found = [], 0
+        jiosaavn_songs, total_found = search_jiosaavn(query, page, per_page)
         print(f"Found {len(jiosaavn_songs)} JioSaavn songs")
         # Combine results (static songs first)
         # Ensure all external URLs are HTTPS in the response
@@ -716,12 +713,25 @@ def proxy_audio(audio_url):
         return jsonify({'error': 'Failed to proxy audio'}), 500
 
 # Serve React static files
+# @app.route('/', defaults={'path': ''})
+# @app.route('/<path:path>')
+# def serve_react(path):
+#     build_dir = os.path.join(os.path.dirname(__file__), 'frontend', 'build')
+#     if path != "" and os.path.exists(os.path.join(build_dir, path)):
+#         return send_from_directory(build_dir, path)
+#     else:
+#         return send_from_directory(build_dir, 'index.html')
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_react(path):
-    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
-        return send_from_directory(app.static_folder, path)
+    if path != "" and os.path.exists(os.path.join('static', path)):
+        return send_from_directory('static', path)
     return render_template('index.html')
+
+@app.route('/static/<path:filename>')
+def serve_react_static(filename):
+    build_static_dir = os.path.join(os.path.dirname(__file__), 'frontend', 'build', 'static')
+    return send_from_directory(build_static_dir, filename)
 
 # Health check endpoint
 @app.route('/api/health')
