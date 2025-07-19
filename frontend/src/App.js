@@ -84,11 +84,11 @@ function App() {
 
   // --- Toast for feedback ---
   const [toast, setToast] = useState('');
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+  const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 2500); }, []);
 
   // Initialize app
   // Helper to load shuffled/random songs (local/demo)
-  const loadRandomSongs = async (reset = true, nextPage = 1) => {
+  const loadRandomSongs = useCallback(async (reset = true, nextPage = 1) => {
     setIsLoading(true);
     try {
       const response = await axios.get(`${API_BASE}/api/songs?per_page=20&page=${nextPage}`);
@@ -116,10 +116,10 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentSong]);
 
   // Helper to load more JioSaavn songs (online)
-  const fetchMoreOnline = async (reset = false, nextPage = 1) => {
+  const fetchMoreOnline = useCallback(async (reset = false, nextPage = 1) => {
     setIsLoading(true);
     try {
       const response = await axios.get(`${API_BASE}/api/search?q=${encodeURIComponent(onlineQuery)}&per_page=20&page=${nextPage}`);
@@ -152,7 +152,7 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [onlineQuery, currentSong]);
 
   useEffect(() => {
     // On mount, try to load random online songs first
@@ -611,8 +611,8 @@ function App() {
     }
   };
 
-  // Get background style with song image
-  const getContainerStyle = () => {
+  // Get background style with song image - memoized to prevent re-renders
+  const getContainerStyle = useMemo(() => {
     const baseStyle = {
       minHeight: '100vh',
       background: 'var(--bg-main)',
@@ -634,11 +634,11 @@ function App() {
     }
 
     return baseStyle;
-  };
+  }, [currentSong, isPlaying]);
 
   // Styles with mobile responsiveness - memoized to prevent re-renders
   const styles = useMemo(() => ({
-    container: getContainerStyle(),
+    container: getContainerStyle,
     content: {
       maxWidth: '1200px',
       margin: '0 auto',
@@ -825,7 +825,7 @@ function App() {
       backgroundColor: 'var(--spotify-green)',
       color: '#fff'
     }
-  }), [currentSong, isPlaying]); // Memoize based on dependencies that affect styles
+  }), [getContainerStyle]); // Memoize based on the memoized container style
 
   // --- Auth Functions ---
   useEffect(() => {
