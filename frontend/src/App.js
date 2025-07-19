@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import './App.css';
 
@@ -14,6 +14,7 @@ function useDarkMode() {
   useEffect(() => {
     localStorage.setItem('theme', theme);
     document.body.setAttribute('data-theme', theme);
+    console.log('Body data-theme:', document.body.getAttribute('data-theme'), 'Theme:', theme);
   }, [theme]);
   
   return [theme, setTheme];
@@ -22,7 +23,7 @@ function useDarkMode() {
 let renderCount = 0;
 function App() {
   renderCount += 1;
-  console.log(`[DEBUG] App function re-render #${renderCount}`);
+  console.log('[DEBUG] App rendered', renderCount);
   const [theme, setTheme] = useDarkMode();
   // Core state
   const [songs, setSongs] = useState([]);
@@ -84,11 +85,11 @@ function App() {
 
   // --- Toast for feedback ---
   const [toast, setToast] = useState('');
-  const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 2500); }, []);
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
   // Initialize app
   // Helper to load shuffled/random songs (local/demo)
-  const loadRandomSongs = useCallback(async (reset = true, nextPage = 1) => {
+  const loadRandomSongs = async (reset = true, nextPage = 1) => {
     setIsLoading(true);
     try {
       const response = await axios.get(`${API_BASE}/api/songs?per_page=20&page=${nextPage}`);
@@ -116,10 +117,10 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentSong]);
+  };
 
   // Helper to load more JioSaavn songs (online)
-  const fetchMoreOnline = useCallback(async (reset = false, nextPage = 1) => {
+  const fetchMoreOnline = async (reset = false, nextPage = 1) => {
     setIsLoading(true);
     try {
       const response = await axios.get(`${API_BASE}/api/search?q=${encodeURIComponent(onlineQuery)}&per_page=20&page=${nextPage}`);
@@ -152,16 +153,26 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [onlineQuery, currentSong]);
+  };
 
-  // Re-enabled with simplified logic to prevent loops
   useEffect(() => {
+    // On mount, try to load random online songs first
+    const shuffleArray = (array) => {
+      const arr = array.slice();
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
     const loadInitialSongs = async () => {
       setIsLoading(true);
       try {
+        // Try fetching random online songs (e.g., bollywood as default)
         const response = await axios.get(`${API_BASE}/api/search?q=bollywood&per_page=20&page=1`);
-        const fetchedSongs = response.data.songs || [];
+        let fetchedSongs = response.data.songs || [];
         if (fetchedSongs.length > 0) {
+          fetchedSongs = shuffleArray(fetchedSongs); // Shuffle for randomness
           setSongs(fetchedSongs);
           setMode('online');
           setOnlinePage(1);
