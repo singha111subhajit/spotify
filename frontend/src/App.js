@@ -201,9 +201,14 @@ function App() {
   // --- Player controls (move these above useEffect hooks) ---
   const togglePlayPause = useCallback(() => {
     if (!currentSong || !audioRef.current) return;
+    
+    console.log('Toggle play/pause - current isPlaying:', isPlaying);
+    
     if (isPlaying) {
+      console.log('Pausing audio...');
       audioRef.current.pause();
     } else {
+      console.log('Playing audio...');
       audioRef.current.play().catch(error => {
         console.error('Playback failed:', error);
         setIsPlaying(false);
@@ -214,7 +219,15 @@ function App() {
   const handleSongSelect = useCallback((song, index) => {
     setCurrentSong(song);
     setCurrentIndex(index);
-    // Don't set isPlaying here - let the audio element handle it
+    // Start playing the selected song
+    setTimeout(() => {
+      if (audioRef.current) {
+        audioRef.current.play().catch(error => {
+          console.error('Playback failed:', error);
+          setIsPlaying(false);
+        });
+      }
+    }, 100); // Small delay to ensure audio element is ready
   }, []);
 
   // Enhanced fetchMoreOnline with better error handling
@@ -294,7 +307,15 @@ function App() {
     
     setCurrentIndex(nextIndex);
     setCurrentSong(songs[nextIndex]);
-    // Don't set isPlaying here - let the audio element handle it
+    // Start playing the next song
+    setTimeout(() => {
+      if (audioRef.current) {
+        audioRef.current.play().catch(error => {
+          console.error('Playback failed:', error);
+          setIsPlaying(false);
+        });
+      }
+    }, 100); // Small delay to ensure audio element is ready
   }, [currentIndex, songs, isShuffled, repeatMode, hasMore, onlineHasMore, isLoading, loadMoreSongsAutomatically]);
 
   const handlePrevious = useCallback(() => {
@@ -311,6 +332,15 @@ function App() {
     }
     setCurrentIndex(prevIndex);
     setCurrentSong(songs[prevIndex]);
+    // Start playing the previous song
+    setTimeout(() => {
+      if (audioRef.current) {
+        audioRef.current.play().catch(error => {
+          console.error('Playback failed:', error);
+          setIsPlaying(false);
+        });
+      }
+    }, 100); // Small delay to ensure audio element is ready
   }, [currentIndex, songs, isShuffled, currentTime]);
 
   const handleSeek = useCallback((e) => {
@@ -354,7 +384,7 @@ function App() {
   }, [setTheme]);
 
   // --- useEffect hooks ---
-  // Restore auto-play when song changes
+  // Handle song changes
   useEffect(() => {
     if (currentSong && audioRef.current) {
       audioRef.current.pause();
@@ -362,11 +392,7 @@ function App() {
       audioRef.current.load();
       setCurrentTime(0); // Reset progress
       setDuration(0);   // Reset duration
-      // Auto-play when song changes (user clicked on a song)
-      audioRef.current.play().catch(error => {
-        console.error('Playback failed:', error);
-        setIsPlaying(false);
-      });
+      setIsPlaying(false); // Reset playing state when song changes
     }
     // eslint-disable-next-line
   }, [currentSong]);
