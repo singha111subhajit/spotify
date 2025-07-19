@@ -200,20 +200,11 @@ function App() {
 
   // --- Player controls (move these above useEffect hooks) ---
   const togglePlayPause = useCallback(() => {
-    if (!currentSong || !audioRef.current) {
-      console.log('No current song or audio ref');
-      return;
-    }
-    
-    console.log('Toggle play/pause - current isPlaying:', isPlaying);
-    console.log('Audio readyState:', audioRef.current.readyState);
-    console.log('Audio paused:', audioRef.current.paused);
+    if (!currentSong || !audioRef.current) return;
     
     if (isPlaying) {
-      console.log('Pausing audio...');
       audioRef.current.pause();
     } else {
-      console.log('Playing audio...');
       // Check if audio is ready
       if (audioRef.current.readyState >= 2) { // HAVE_CURRENT_DATA
         audioRef.current.play().catch(error => {
@@ -221,7 +212,6 @@ function App() {
           setIsPlaying(false);
         });
       } else {
-        console.log('Audio not ready, waiting for metadata...');
         audioRef.current.addEventListener('canplay', () => {
           audioRef.current.play().catch(error => {
             console.error('Playback failed after canplay:', error);
@@ -403,32 +393,19 @@ function App() {
   // Handle song changes
   useEffect(() => {
     if (currentSong && audioRef.current) {
-      console.log('Song changed to:', currentSong.title, 'URL:', currentSong.url);
       audioRef.current.pause();
       audioRef.current.src = currentSong.url;
       audioRef.current.load();
       setCurrentTime(0); // Reset progress
       setDuration(0);   // Reset duration
       setIsPlaying(false); // Reset playing state when song changes
-      
-      // Ensure audio element is properly configured
-      audioRef.current.volume = isMuted ? 0 : volume;
-      console.log('Audio element configured with volume:', audioRef.current.volume);
     }
     // eslint-disable-next-line
-  }, [currentSong, volume, isMuted]);
+  }, [currentSong]);
 
 
 
-  // Debug: Monitor isPlaying state changes
-  useEffect(() => {
-    console.log('isPlaying state changed to:', isPlaying);
-  }, [isPlaying]);
 
-  // Debug: Monitor currentTime changes
-  useEffect(() => {
-    console.log('currentTime changed to:', currentTime);
-  }, [currentTime]);
 
   // Restore user fetch on jwt change
   useEffect(() => {
@@ -1341,18 +1318,9 @@ function App() {
                   console.error('Audio error:', e);
                   console.log('Failed URL:', currentSong.url);
                 }}
-                onPlay={() => {
-                  console.log('Audio onPlay event fired');
-                  setIsPlaying(true);
-                }}
-                onPause={() => {
-                  console.log('Audio onPause event fired');
-                  setIsPlaying(false);
-                }}
-                onTimeUpdate={e => {
-                  console.log('Audio onTimeUpdate:', e.target.currentTime);
-                  setCurrentTime(e.target.currentTime);
-                }}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onTimeUpdate={e => setCurrentTime(e.target.currentTime)}
                 onLoadedMetadata={e => setDuration(e.target.duration)}
                 onEnded={() => {
                   if (repeatMode === 'one') {
