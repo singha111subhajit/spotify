@@ -14,7 +14,6 @@ function useDarkMode() {
   useEffect(() => {
     localStorage.setItem('theme', theme);
     document.body.setAttribute('data-theme', theme);
-    console.log('Body data-theme:', document.body.getAttribute('data-theme'), 'Theme:', theme);
   }, [theme]);
   
   return [theme, setTheme];
@@ -871,8 +870,7 @@ function App() {
 
   // --- Playlist Functions ---
   // Fetch default playlist and its songs
-  const fetchPlaylistAndSongs = async () => {
-    console.log('[DEBUG] fetchPlaylistAndSongs called');
+  const fetchPlaylistAndSongs = useCallback(async () => {
     if (!jwt) return;
     setPlaylistLoading(true);
     setPlaylistError('');
@@ -892,7 +890,7 @@ function App() {
     } finally {
       setPlaylistLoading(false);
     }
-  };
+  }, [jwt]);
 
   // Add song to default playlist
   const handleAddSongToPlaylist = async (song) => {
@@ -926,10 +924,9 @@ function App() {
   // Fetch playlist when sidebar opens
   useEffect(() => { 
     if (playlistSidebarOpen) {
-      console.log('[DEBUG] useEffect: playlistSidebarOpen is true, calling fetchPlaylistAndSongs');
       fetchPlaylistAndSongs();
     }
-  }, [playlistSidebarOpen, jwt]);
+  }, [playlistSidebarOpen, fetchPlaylistAndSongs]);
 
   if (error) {
     return (
