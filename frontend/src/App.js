@@ -201,39 +201,20 @@ function App() {
   // --- Player controls (move these above useEffect hooks) ---
   const togglePlayPause = useCallback(() => {
     if (!currentSong || !audioRef.current) return;
-    
     if (isPlaying) {
       audioRef.current.pause();
     } else {
-      // Check if audio is ready
-      if (audioRef.current.readyState >= 2) { // HAVE_CURRENT_DATA
-        audioRef.current.play().catch(error => {
-          console.error('Playback failed:', error);
-          setIsPlaying(false);
-        });
-      } else {
-        audioRef.current.addEventListener('canplay', () => {
-          audioRef.current.play().catch(error => {
-            console.error('Playback failed after canplay:', error);
-            setIsPlaying(false);
-          });
-        }, { once: true });
-      }
+      audioRef.current.play().catch(error => {
+        console.error('Playback failed:', error);
+        setIsPlaying(false);
+      });
     }
   }, [isPlaying, currentSong]);
 
   const handleSongSelect = useCallback((song, index) => {
     setCurrentSong(song);
     setCurrentIndex(index);
-    // Start playing the selected song
-    setTimeout(() => {
-      if (audioRef.current) {
-        audioRef.current.play().catch(error => {
-          console.error('Playback failed:', error);
-          setIsPlaying(false);
-        });
-      }
-    }, 100); // Small delay to ensure audio element is ready
+    setIsPlaying(true);
   }, []);
 
   // Enhanced fetchMoreOnline with better error handling
@@ -313,15 +294,7 @@ function App() {
     
     setCurrentIndex(nextIndex);
     setCurrentSong(songs[nextIndex]);
-    // Start playing the next song
-    setTimeout(() => {
-      if (audioRef.current) {
-        audioRef.current.play().catch(error => {
-          console.error('Playback failed:', error);
-          setIsPlaying(false);
-        });
-      }
-    }, 100); // Small delay to ensure audio element is ready
+    setIsPlaying(true); // Ensure next song auto-plays
   }, [currentIndex, songs, isShuffled, repeatMode, hasMore, onlineHasMore, isLoading, loadMoreSongsAutomatically]);
 
   const handlePrevious = useCallback(() => {
@@ -338,15 +311,6 @@ function App() {
     }
     setCurrentIndex(prevIndex);
     setCurrentSong(songs[prevIndex]);
-    // Start playing the previous song
-    setTimeout(() => {
-      if (audioRef.current) {
-        audioRef.current.play().catch(error => {
-          console.error('Playback failed:', error);
-          setIsPlaying(false);
-        });
-      }
-    }, 100); // Small delay to ensure audio element is ready
   }, [currentIndex, songs, isShuffled, currentTime]);
 
   const handleSeek = useCallback((e) => {
@@ -390,23 +354,59 @@ function App() {
   }, [setTheme]);
 
   // --- useEffect hooks ---
-  // Re-enabled with simplified logic
-  // useEffect(() => {
-  //   if (currentSong && audioRef.current) {
-  //     audioRef.current.pause();
-  //     audioRef.current.src = currentSong.url;
-  //     audioRef.current.load();
-  //     setCurrentTime(0);
-  //     setDuration(0);
-  //     setIsPlaying(false);
-  //   }
-  // }, [currentSong]);
+  // Auto-play when song changes (only reload audio if song changes)
+  // Comment out all useEffects except volume control
+  
+  useEffect(() => {
+    if (currentSong && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = currentSong.url;
+      audioRef.current.load();
+      setCurrentTime(0); // Reset progress
+      setDuration(0);   // Reset duration
+      if (isPlaying) {
+        audioRef.current.play().catch(error => {
+          console.error('Playback failed:', error);
+          setIsPlaying(false);
+        });
+      }
+    }
+    // eslint-disable-next-line
+  }, [currentSong]);
 
+  useEffect(() => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.play().catch(error => {
+        console.error('Playback failed:', error);
+        setIsPlaying(false);
+      });
+    } else {
+      audioRef.current.pause();
+    }
+  }, [isPlaying]);
 
-
-
-
-  // Restore user fetch on jwt change
+  
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const updateTime = () => setCurrentTime(audio.currentTime);
+    const updateDuration = () => setDuration(audio.duration);
+    const onEnded = async () => {};
+    const onSeeked = () => setCurrentTime(audio.currentTime);
+    audio.addEventListener('timeupdate', updateTime);
+    audio.addEventListener('loadedmetadata', updateDuration);
+    audio.addEventListener('ended', onEnded);
+    audio.addEventListener('seeked', onSeeked);
+    return () => {
+      audio.removeEventListener('timeupdate', updateTime);
+      audio.removeEventListener('loadedmetadata', updateDuration);
+      audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('seeked', onSeeked);
+    };
+  }, [currentSong, repeatMode, isShuffled, currentIndex, songs.length]);
+  
+ 
   useEffect(() => {
     if (jwt) {
       axios.get(`${API_BASE}/me`, { headers: { Authorization: `Bearer ${jwt}` } })
@@ -417,12 +417,13 @@ function App() {
     }
   }, [jwt]);
 
-  // Restore playlist fetch when sidebar opens
   useEffect(() => { 
     if (playlistSidebarOpen) {
+      console.log('[DEBUG] useEffect: playlistSidebarOpen is true, calling fetchPlaylistAndSongs');
       fetchPlaylistAndSongs();
     }
   }, [playlistSidebarOpen, jwt]);
+  
 
   // Volume control
   useEffect(() => {
@@ -432,7 +433,7 @@ function App() {
   }, [volume, isMuted]);
 
   // Keyboard shortcuts
-  /*
+  
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (e.target.tagName === 'INPUT') return;
@@ -471,7 +472,7 @@ function App() {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, []);
-  */
+  
 
   // Player controls
   // ...existing code...
@@ -497,15 +498,6 @@ function App() {
       if (response.data.songs.length > 0 && !currentSong) {
         setCurrentSong(response.data.songs[0]);
         setCurrentIndex(0);
-        // Start playing the first search result
-        setTimeout(() => {
-          if (audioRef.current) {
-            audioRef.current.play().catch(error => {
-              console.error('Playback failed:', error);
-              setIsPlaying(false);
-            });
-          }
-        }, 100);
       }
       // Update current index if current song is in new results
       if (currentSong) {
@@ -611,19 +603,34 @@ function App() {
     }
   };
 
-  // Get background style with song image - simplified to prevent loops
-  const getContainerStyle = {
-    minHeight: '100vh',
-    background: 'var(--bg-main)',
-    color: 'var(--text-main)',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    transition: 'background 0.3s, color 0.3s',
-    position: 'relative'
+  // Get background style with song image
+  const getContainerStyle = () => {
+    const baseStyle = {
+      minHeight: '100vh',
+      background: 'var(--bg-main)',
+      color: 'var(--text-main)',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      transition: 'background 0.3s, color 0.3s',
+      position: 'relative'
+    };
+
+    // Add background image if song has thumbnail
+    if (currentSong && currentSong.thumbnail && isPlaying) {
+      return {
+        ...baseStyle,
+        backgroundImage: `linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.8)), url(${currentSong.thumbnail})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed'
+      };
+    }
+
+    return baseStyle;
   };
 
-  // Styles with mobile responsiveness - memoized to prevent re-renders
+  // Styles with mobile responsiveness
   const styles = {
-    container: getContainerStyle,
+    container: getContainerStyle(),
     content: {
       maxWidth: '1200px',
       margin: '0 auto',
@@ -682,19 +689,22 @@ function App() {
       padding: 'clamp(20px, 4vw, 30px)', // Responsive padding
       marginBottom: '30px',
       border: '1px solid var(--border-main)',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.3)' // Simplified shadow
+      boxShadow: '0 8px 32px rgba(0,0,0,0.3)', // Enhanced shadow for background images
+      backdropFilter: currentSong && currentSong.thumbnail ? 'blur(10px)' : 'none'
     },
     albumArt: {
       width: 'clamp(100px, 20vw, 120px)', // Responsive size
       height: 'clamp(100px, 20vw, 120px)',
       borderRadius: '15px',
-      background: 'var(--spotify-gray)',
+      background: currentSong && currentSong.thumbnail 
+        ? `url(${currentSong.thumbnail}) center/cover` 
+        : 'var(--spotify-gray)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       fontSize: '3rem',
       margin: '0 auto 20px',
-      color: 'var(--spotify-green)',
+      color: currentSong && currentSong.thumbnail ? 'transparent' : 'var(--spotify-green)',
       boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
     },
     songTitle: {
@@ -855,7 +865,8 @@ function App() {
 
   // --- Playlist Functions ---
   // Fetch default playlist and its songs
-  const fetchPlaylistAndSongs = useCallback(async () => {
+  const fetchPlaylistAndSongs = async () => {
+    console.log('[DEBUG] fetchPlaylistAndSongs called');
     if (!jwt) return;
     setPlaylistLoading(true);
     setPlaylistError('');
@@ -875,7 +886,7 @@ function App() {
     } finally {
       setPlaylistLoading(false);
     }
-  }, [jwt]);
+  };
 
   // Add song to default playlist
   const handleAddSongToPlaylist = async (song) => {
@@ -906,15 +917,13 @@ function App() {
     }
   };
 
-  // Temporarily disabled to isolate render loop
-  /*
   // Fetch playlist when sidebar opens
   useEffect(() => { 
     if (playlistSidebarOpen) {
+      console.log('[DEBUG] useEffect: playlistSidebarOpen is true, calling fetchPlaylistAndSongs');
       fetchPlaylistAndSongs();
     }
-  }, [playlistSidebarOpen, fetchPlaylistAndSongs]);
-  */
+  }, [playlistSidebarOpen, jwt]);
 
   if (error) {
     return (
@@ -1134,15 +1143,7 @@ function App() {
                         setSuggestions([]); // Hide dropdown until new input
                         setCurrentSong(s);
                         setCurrentIndex(0);
-                        // Start playing the selected song
-                        setTimeout(() => {
-                          if (audioRef.current) {
-                            audioRef.current.play().catch(error => {
-                              console.error('Playback failed:', error);
-                              setIsPlaying(false);
-                            });
-                          }
-                        }, 100);
+                        setIsPlaying(true);
                       }}
                       onMouseEnter={() => setActiveSuggestion(i)}
                     >
@@ -1294,28 +1295,11 @@ function App() {
 
               <audio
                 ref={audioRef}
-                src={currentSong?.url}
+                src={currentSong.url}
                 preload="metadata"
                 onError={(e) => {
                   console.error('Audio error:', e);
                   console.log('Failed URL:', currentSong.url);
-                }}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onTimeUpdate={e => setCurrentTime(e.target.currentTime)}
-                onLoadedMetadata={e => setDuration(e.target.duration)}
-                onEnded={() => {
-                  if (repeatMode === 'one') {
-                    audioRef.current.currentTime = 0;
-                    audioRef.current.play();
-                  } else if (isShuffled) {
-                    const nextIndex = Math.floor(Math.random() * songs.length);
-                    if (nextIndex !== currentIndex) setCurrentIndex(nextIndex);
-                  } else if (currentIndex + 1 < songs.length) {
-                    setCurrentIndex(currentIndex + 1);
-                  } else {
-                    setIsPlaying(false);
-                  }
                 }}
               />
             </>
