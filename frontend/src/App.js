@@ -19,7 +19,10 @@ function useDarkMode() {
   return [theme, setTheme];
 }
 
+let renderCount = 0;
 function App() {
+  renderCount += 1;
+  console.log(`[DEBUG] App function re-render #${renderCount}`);
   const [theme, setTheme] = useDarkMode();
   // Core state
   const [songs, setSongs] = useState([]);
