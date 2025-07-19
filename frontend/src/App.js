@@ -214,7 +214,7 @@ function App() {
   const handleSongSelect = useCallback((song, index) => {
     setCurrentSong(song);
     setCurrentIndex(index);
-    setIsPlaying(true);
+    // Don't set isPlaying here - let the audio element handle it
   }, []);
 
   // Enhanced fetchMoreOnline with better error handling
@@ -294,7 +294,7 @@ function App() {
     
     setCurrentIndex(nextIndex);
     setCurrentSong(songs[nextIndex]);
-    setIsPlaying(true); // Ensure next song auto-plays
+    // Don't set isPlaying here - let the audio element handle it
   }, [currentIndex, songs, isShuffled, repeatMode, hasMore, onlineHasMore, isLoading, loadMoreSongsAutomatically]);
 
   const handlePrevious = useCallback(() => {
@@ -362,28 +362,16 @@ function App() {
       audioRef.current.load();
       setCurrentTime(0); // Reset progress
       setDuration(0);   // Reset duration
-      if (isPlaying) {
-        audioRef.current.play().catch(error => {
-          console.error('Playback failed:', error);
-          setIsPlaying(false);
-        });
-      }
-    }
-    // eslint-disable-next-line
-  }, [currentSong]);
-
-  // Restore play/pause effect
-  useEffect(() => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
+      // Auto-play when song changes (user clicked on a song)
       audioRef.current.play().catch(error => {
         console.error('Playback failed:', error);
         setIsPlaying(false);
       });
-    } else {
-      audioRef.current.pause();
     }
-  }, [isPlaying]);
+    // eslint-disable-next-line
+  }, [currentSong]);
+
+
 
   // Restore user fetch on jwt change
   useEffect(() => {
@@ -1279,6 +1267,8 @@ function App() {
                   console.error('Audio error:', e);
                   console.log('Failed URL:', currentSong.url);
                 }}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
                 onTimeUpdate={e => setCurrentTime(e.target.currentTime)}
                 onLoadedMetadata={e => setDuration(e.target.duration)}
                 onEnded={() => {
