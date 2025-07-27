@@ -198,10 +198,25 @@ function App() {
     }
   }, [isPlaying, currentSong]);
 
+  // 3. Playlist auto-next logic
+  const [isPlaylistMode, setIsPlaylistMode] = useState(false);
+  const [playlistPlayIndex, setPlaylistPlayIndex] = useState(0);
+
+  // When user plays a song from playlist, set playlist mode
+  const handlePlaylistSongSelect = (song, index) => {
+    setCurrentSong(song);
+    setCurrentIndex(index);
+    setIsPlaying(true);
+    setIsPlaylistMode(true);
+    setPlaylistPlayIndex(index);
+  };
+
+  // When user plays a song from main list, reset playlist mode
   const handleSongSelect = useCallback((song, index) => {
     setCurrentSong(song);
     setCurrentIndex(index);
     setIsPlaying(true);
+    setIsPlaylistMode(false);
   }, []);
 
   // Enhanced fetchMoreOnline with better error handling
@@ -243,9 +258,24 @@ function App() {
     }
   }, [isLoading, mode, hasMore, page, totalPages, onlineHasMore, onlinePage, loadRandomSongs, fetchMoreOnline]);
 
+  // On song end, if in playlist mode, play next in playlistSongs
   const handleNext = useCallback(async () => {
-    if (songs.length === 0) return;
-    
+    if (isPlaylistMode && playlistSongs.length > 0) {
+      let nextIndex = playlistPlayIndex + 1;
+      if (nextIndex >= playlistSongs.length) {
+        nextIndex = 0; // Loop to start
+      }
+      setPlaylistPlayIndex(nextIndex);
+      const nextSongId = playlistSongs[nextIndex]?.song_id;
+      const nextSong = songs.find(s => s.id === nextSongId);
+      if (nextSong) {
+        setCurrentSong(nextSong);
+        setCurrentIndex(songs.findIndex(s => s.id === nextSongId));
+        setIsPlaying(true);
+        return;
+      }
+      // If not found, fallback to normal
+    }
     let nextIndex;
     if (repeatMode === 'one') {
       nextIndex = currentIndex;
@@ -282,7 +312,7 @@ function App() {
     setCurrentIndex(nextIndex);
     setCurrentSong(songs[nextIndex]);
     setIsPlaying(true); // Ensure next song auto-plays
-  }, [currentIndex, songs, isShuffled, repeatMode, hasMore, onlineHasMore, isLoading, loadMoreSongsAutomatically]);
+  }, [isPlaylistMode, playlistSongs, playlistPlayIndex, songs, currentIndex, repeatMode, isShuffled, hasMore, onlineHasMore, isLoading, loadMoreSongsAutomatically]);
 
   const handlePrevious = useCallback(() => {
     if (songs.length === 0) return;
@@ -853,8 +883,17 @@ function App() {
     }
   }, [jwt]);
 
+  // 1. Fetch playlist after login and on mount if JWT exists
+  useEffect(() => {
+    if (jwt) {
+      fetchPlaylistAndSongs();
+    }
+  }, [jwt]);
+
+  // 2. Prevent multiple register submits and reloads
   const handleAuth = async (e) => {
     e.preventDefault();
+    if (authLoading) return; // Prevent double submit
     setAuthLoading(true);
     setAuthError('');
     const form = e.target;
@@ -866,11 +905,14 @@ function App() {
         await axios.post(`${API_BASE}/register`, { username, user_id, password });
         setAuthMode('login');
         setAuthError('Registered! Please log in.');
+        setAuthLoading(false);
+        return; // Do not continue to login
       } else {
         const res = await axios.post(`${API_BASE}/login`, { user_id, password });
         setJwt(res.data.token);
         localStorage.setItem('jwt', res.data.token);
         setAuthModalOpen(false);
+        fetchPlaylistAndSongs(); // Fetch playlist after login
       }
     } catch (err) {
       setAuthError(err.response?.data?.error || 'Auth failed');
@@ -1006,23 +1048,14 @@ function App() {
             <>
               <h3 style={{margin: 0, fontSize: '1.1em', color: 'var(--spotify-green)'}}>{playlist.name}</h3>
               <div style={{ maxHeight: 320, overflowY: 'auto', marginTop: 10 }}>
-                {playlistSongs.length === 0 ? <div style={{color:'#aaa'}}>No songs</div> : playlistSongs.map(song => {
+                {playlistSongs.length === 0 ? <div style={{color:'#aaa'}}>No songs</div> : playlistSongs.map((song, index) => {
                   // Try to find full song info from main song list for better display
                   const fullSong = songs.find(s => s.id === song.song_id);
                   return (
                     <div key={song.id} style={{
                       display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #232323', cursor: 'pointer', background: currentSong?.id === song.song_id ? 'var(--spotify-green)' : 'transparent', color: currentSong?.id === song.song_id ? '#fff' : 'var(--text-main)'
                     }}
-                      onClick={e => {
-                        // Only play song, do not close sidebar
-                        e.stopPropagation();
-                        const idx = songs.findIndex(s => s.id === song.song_id);
-                        if (idx !== -1) {
-                          setCurrentSong(songs[idx]);
-                          setCurrentIndex(idx);
-                          setIsPlaying(true);
-                        }
-                      }}
+                      onClick={() => handlePlaylistSongSelect(fullSong || song, index)}
                     >
                       {/* Thumbnail */}
                       {fullSong && fullSong.thumbnail ? (
