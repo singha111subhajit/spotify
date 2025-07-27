@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import './App.css';
+import AudioPlayer from './components/AudioPlayer';
 
 // API base URL for backend (set via env in production)
 const API_BASE = process.env.REACT_APP_API_BASE || '';
@@ -39,8 +40,6 @@ function App() {
   const songListRef = useRef(null);
   
   // Audio state
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.8);
   const [isMuted, setIsMuted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -287,7 +286,7 @@ function App() {
 
   const handlePrevious = useCallback(() => {
     if (songs.length === 0) return;
-    if (currentTime > 3) {
+    if (audioRef.current && audioRef.current.currentTime > 3) {
       audioRef.current.currentTime = 0;
       return;
     }
@@ -299,16 +298,15 @@ function App() {
     }
     setCurrentIndex(prevIndex);
     setCurrentSong(songs[prevIndex]);
-  }, [currentIndex, songs, isShuffled, currentTime]);
+  }, [currentIndex, songs, isShuffled]);
 
   const handleSeek = useCallback((e) => {
-    if (!audioRef.current || !duration) return;
+    if (!audioRef.current || !audioRef.current.duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const percent = (e.clientX - rect.left) / rect.width;
-    const newTime = percent * duration;
+    const newTime = percent * audioRef.current.duration;
     audioRef.current.currentTime = newTime;
-    setCurrentTime(newTime);
-  }, [duration]);
+  }, []);
 
   const toggleMute = useCallback(() => {
     setIsMuted(prev => !prev);
@@ -348,8 +346,6 @@ function App() {
       audioRef.current.pause();
       audioRef.current.src = currentSong.url;
       audioRef.current.load();
-      setCurrentTime(0); // Reset progress
-      setDuration(0);   // Reset duration
       if (isPlaying) {
         audioRef.current.play().catch(error => {
           console.error('Playback failed:', error);
@@ -395,11 +391,6 @@ function App() {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const updateTime = () => {
-      setCurrentTime(audio.currentTime);
-      // console.log('audio.currentTime:', audio.currentTime);
-    };
-    const updateDuration = () => setDuration(audio.duration);
     const onEnded = async () => {
       // Only advance if not at the end of the list
       if (repeatMode === 'one') {
@@ -414,7 +405,7 @@ function App() {
         setIsLoading(true);
         let prevSongsLen = songs.length;
         if (mode === 'local') {
-          await fetchMoreRandom();
+          await loadRandomSongs(false, page + 1);
         } else if (mode === 'online') {
           await fetchMoreOnline(false, onlinePage + 1);
         }
@@ -433,25 +424,22 @@ function App() {
     };
     const onPlay = () => {
       setIsPlaying(true);
-      setCurrentTime(audio.currentTime);
     };
     const onPause = () => setIsPlaying(false);
-    const onSeeked = () => setCurrentTime(audio.currentTime);
-    // audio.addEventListener('timeupdate', updateTime);
-    audio.addEventListener('loadedmetadata', updateDuration);
+    const onSeeked = () => {
+      // setCurrentTime(audio.currentTime); // This is now handled by AudioPlayer
+    };
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
     audio.addEventListener('seeked', onSeeked);
     return () => {
-      // audio.removeEventListener('timeupdate', updateTime);
-      audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('play', onPlay);
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('seeked', onSeeked);
     };
-  }, [currentSong, handleNext, repeatMode, isShuffled, currentIndex, songs.length]);
+  }, [currentSong, handleNext, repeatMode, isShuffled, currentIndex, songs.length, hasMore, mode, page, onlinePage, loadRandomSongs, fetchMoreOnline]);
   
 
 
@@ -630,7 +618,7 @@ function App() {
     return () => {
       if (suggestionTimeout.current) clearTimeout(suggestionTimeout.current);
     };
-  }, [searchQuery]);
+  }, [searchQuery, isLoading]);
 
   // Hide suggestions on blur (with delay to allow click)
   const handleInputBlur = () => {
@@ -646,7 +634,7 @@ function App() {
   };
 
   const getProgressPercent = () => {
-    return duration ? (currentTime / duration) * 100 : 0;
+    return audioRef.current && audioRef.current.duration ? (audioRef.current.currentTime / audioRef.current.duration) * 100 : 0;
   };
 
   // Get theme label for button
@@ -1212,149 +1200,26 @@ function App() {
 
         {/* Music Player */}
         <div style={styles.playerCard}>
-          {currentSong ? (
-            <>
-              {/* Album Art with image */}
-              <div style={styles.albumArt}>
-                {!(currentSong.thumbnail) && '🎵'}
-              </div>
-
-              {/* Song Info with better metadata display */}
-              <h3 style={styles.songTitle}>{currentSong.title || 'Unknown Title'}</h3>
-              <div style={styles.artistName}>{currentSong.artist || 'Unknown Artist'}</div>
-
-              {/* Progress Bar + Equalizer */}
-              <div className="progress-container" onClick={handleSeek} style={{ cursor: 'pointer', width: '100%' }}>
-                {/* Animated Equalizer (shows only when playing) */}
-                <div className="equalizer" style={{ opacity: isPlaying ? 1 : 0.3, transition: 'opacity 0.3s' }}>
-                  <div className="eq-bar" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
-                  <div className="eq-bar" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
-                  <div className="eq-bar" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
-                  <div className="eq-bar" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
-                  <div className="eq-bar" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
-                </div>
-                {/* Progress Bar */}
-                <div className="progress">
-                  <div
-                    className="progress-bar"
-                    style={{ width: `${getProgressPercent()}%` }}
-                  />
-                </div>
-                <div className="time-display" style={{ 
-                  minWidth: 'clamp(60px, 15vw, 80px)', // Responsive width
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  fontSize: 'clamp(12px, 3vw, 14px)', // Responsive font size
-                  marginLeft: 'clamp(4px, 2vw, 8px)' // Responsive margin
-                }}>
-                  <span>{formatTime(currentTime)}</span>
-                  <span>{formatTime(duration)}</span>
-                </div>
-              </div>
-
-              {/* Main Controls */}
-              <div style={styles.controls}>
-                <button
-                  onClick={toggleShuffle}
-                  style={{
-                    ...styles.controlButton,
-                    backgroundColor: isShuffled ? '#10b981' : styles.controlButton.backgroundColor
-                  }}
-                  title="Shuffle (S)"
-                >
-                  🔀
-                </button>
-
-                <button
-                  onClick={handlePrevious}
-                  style={styles.controlButton}
-                  title="Previous (←)"
-                >
-                  ⏮️
-                </button>
-
-                <button
-                  onClick={togglePlayPause}
-                  style={{...styles.controlButton, ...styles.playButton}}
-                  disabled={!currentSong}
-                  title="Play/Pause (Space)"
-                >
-                  {isPlaying ? '⏸️' : '▶️'}
-                </button>
-
-                <button
-                  onClick={handleNext}
-                  style={styles.controlButton}
-                  title="Next (→)"
-                >
-                  ⏭️
-                </button>
-
-                <button
-                  onClick={toggleRepeat}
-                  style={{
-                    ...styles.controlButton,
-                    backgroundColor: repeatMode !== 'none' ? '#10b981' : styles.controlButton.backgroundColor
-                  }}
-                  title="Repeat (R)"
-                >
-                  {repeatMode === 'one' ? '🔂' : '🔁'}
-                </button>
-              </div>
-
-              {/* Volume Control */}
-              <div style={styles.volumeContainer}>
-                <button
-                  onClick={toggleMute}
-                  style={styles.controlButton}
-                  title="Mute (M)"
-                >
-                  {isMuted ? '🔇' : volume > 0.5 ? '🔊' : '🔉'}
-                </button>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={isMuted ? 0 : volume}
-                  onChange={(e) => setVolume(parseFloat(e.target.value))}
-                  style={styles.volumeSlider}
-                  title="Volume (↑↓)"
-                />
-                <span style={{ fontSize: 'clamp(0.8rem, 2vw, 0.9rem)', minWidth: '40px' }}>
-                  {Math.round((isMuted ? 0 : volume) * 100)}%
-                </span>
-              </div>
-
-              {/* Source Info */}
-              <div style={{ 
-                fontSize: 'clamp(0.7rem, 2vw, 0.8rem)', // Responsive font size
-                color: 'var(--text-secondary)', 
-                textAlign: 'center', 
-                marginTop: '15px',
-                opacity: 0.8
-              }}>
-                Source: {currentSong.source === 'jiosaavn' ? '🎵 ' : currentSong.source === 'api' ? '🌐 Internet Archive' : '📁 Local File'}
-                {currentSong.album && currentSong.album !== 'Unknown Album' && ` • ${currentSong.album}`}
-                {currentSong.year && ` • ${currentSong.year}`}
-              </div>
-
-              <audio
-                key={currentSong?.id || currentSong?.url}
-                ref={audioRef}
-                src={currentSong.url}
-                preload="metadata"
-                onError={(e) => {
-                  console.error('Audio error:', e);
-                  console.log('Failed URL:', currentSong.url);
-                }}
-              />
-            </>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '50px' }}>
-              <p>No song selected</p>
-            </div>
-          )}
+          <AudioPlayer
+            currentSong={currentSong}
+            isPlaying={isPlaying}
+            togglePlayPause={togglePlayPause}
+            handleNext={handleNext}
+            handlePrevious={handlePrevious}
+            handleSeek={handleSeek}
+            toggleMute={toggleMute}
+            toggleShuffle={toggleShuffle}
+            toggleRepeat={toggleRepeat}
+            isShuffled={isShuffled}
+            repeatMode={repeatMode}
+            isMuted={isMuted}
+            volume={volume}
+            setVolume={setVolume}
+            getProgressPercent={getProgressPercent}
+            formatTime={formatTime}
+            styles={styles}
+            audioRef={audioRef}
+          />
         </div>
 
         {/* Song List - ENLARGED by removing keyboard shortcuts */}

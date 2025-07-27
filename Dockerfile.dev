@@ -1,0 +1,32 @@
+# Stage 1: Install dependencies for frontend (optional)
+FROM node:18 AS frontend-deps
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm install
+
+# Stage 2: Python development environment
+FROM python:3.10-slim AS dev
+
+WORKDIR /app
+
+# Install Flask dev tools
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install extra tools for dev
+RUN pip install flask[dotenv] watchdog
+
+# Copy backend source
+COPY . .
+
+# Optionally copy React build (you can remove this if mounting your local build folder)
+COPY --from=frontend-deps /app/frontend /app/frontend
+
+# Expose backend port
+EXPOSE 5600
+
+# Run Flask dev server (auto-reload)
+ENV FLASK_APP=app.py
+ENV FLASK_ENV=development
+
+CMD ["flask", "run", "--host=0.0.0.0", "--port=5600"]
