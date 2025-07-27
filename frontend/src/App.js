@@ -369,25 +369,6 @@ function App() {
     }
   }, [isPlaying]);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // Audio event handlers
-  
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -401,7 +382,6 @@ function App() {
       } else if (currentIndex + 1 < songs.length) {
         handleNext();
       } else if (hasMore) {
-        // At end, but more songs can be loaded: load more and continue
         setIsLoading(true);
         let prevSongsLen = songs.length;
         if (mode === 'local') {
@@ -410,7 +390,6 @@ function App() {
           await fetchMoreOnline(false, onlinePage + 1);
         }
         setIsLoading(false);
-        // If new songs loaded, play the next one
         if (songs.length > prevSongsLen) {
           setCurrentIndex(prevSongsLen);
           setCurrentSong(songs[prevSongsLen]);
@@ -427,7 +406,7 @@ function App() {
     };
     const onPause = () => setIsPlaying(false);
     const onSeeked = () => {
-      // setCurrentTime(audio.currentTime); // This is now handled by AudioPlayer
+      // Progress is now handled by AudioPlayer
     };
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('play', onPlay);
