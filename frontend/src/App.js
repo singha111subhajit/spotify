@@ -984,6 +984,33 @@ function App() {
   // Fetch playlist when sidebar opens
   useEffect(() => { if (playlistSidebarOpen) fetchPlaylistAndSongs(); }, [playlistSidebarOpen, jwt]);
 
+  // Cache clearing function for debugging
+  const clearAllCaches = async () => {
+    if ('caches' in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames.map(cacheName => caches.delete(cacheName))
+      );
+      console.log('All caches cleared');
+      // Reload the page after clearing caches
+      window.location.reload();
+    }
+  };
+
+  // Make clearAllCaches available globally for development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      window.clearAllCaches = clearAllCaches;
+      console.log('Cache clearing function available: window.clearAllCaches()');
+    }
+  }, []);
+
+  // Clear caches on app startup if needed
+  useEffect(() => {
+    // Uncomment the line below if you need to clear caches during development
+    // clearAllCaches();
+  }, []);
+
   if (error) {
     return (
       <div style={styles.container}>
