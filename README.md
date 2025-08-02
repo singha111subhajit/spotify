@@ -17,4 +17,4 @@
    docker run -p 5600:5600 music-player
    ```
 
-gunicorn -w "-b", "0.0.0.0:5600", "app:app
+gunicorn -w -b "0.0.0.0:5600", "app:app
