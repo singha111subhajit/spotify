@@ -31,8 +31,8 @@ JWT_ALGO = 'HS256'
 JWT_EXP_DELTA_SECONDS = 7 * 24 * 3600  # 7 days
 
 # DB_PATH = 'music_app.db'
-# DB_URL = "postgresql://postgres:1408@localhost:5432/music_app_db"
-DB_URL="postgresql://music_db_user:8W8xo6BdzofUIT3jWPEeQhbLmzGVKUf4@dpg-d23e8jndiees739htb90-a/music_db_ahp7"
+DB_URL = "postgresql://postgres:1408@localhost:5432/music_app_db"
+# DB_URL="postgresql://music_db_user:8W8xo6BdzofUIT3jWPEeQhbLmzGVKUf4@dpg-d23e8jndiees739htb90-a/music_db_ahp7"
 
 
 # def get_db():

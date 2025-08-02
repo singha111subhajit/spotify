@@ -17,9 +17,4 @@
    docker run -p 5600:5600 music-player
    ```
 
-4. **Open your browser**
-   - Go to: http://localhost:5000
-
----
-
-**Enjoy your music! 🎵**
+gunicorn -w "-b", "0.0.0.0:5600", "app:app
