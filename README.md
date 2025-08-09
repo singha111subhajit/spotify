@@ -26,4 +26,22 @@
 
 ---
 
+## Run with Docker Compose (includes PostgreSQL)
+
+1. **Start services**
+   ```bash
+   docker compose up -d --build
+   ```
+
+2. **Verify**
+   - App: http://localhost:5600
+   - Postgres: localhost:5432 (user: `music`, password: `music`, db: `music_app`)
+
+3. **Stop services**
+   ```bash
+   docker compose down
+   ```
+
+---
+
 **Enjoy your music! 🎵**
