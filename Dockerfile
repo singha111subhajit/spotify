@@ -9,6 +9,10 @@ RUN npm run build
 # Stage 2: Build Flask backend and combine
 FROM python:3.10-slim AS backend
 WORKDIR /app
+
+# Install build deps for psycopg2 and libpq
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt ./
 RUN pip install -r requirements.txt
 COPY . ./
@@ -26,6 +30,8 @@ COPY frontend/public/service-worker.js ./static/service-worker.js
 
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
+# Placeholder - override at deploy time
+ENV DATABASE_URL=postgresql://postgres:postgres@postgres:5432/music_app
 
 EXPOSE 5600
 

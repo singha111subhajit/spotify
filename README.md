@@ -14,11 +14,15 @@
 3. **Build and run with Docker**
    ```bash
    docker build -t music-player .
-   docker run -p 5600:5600 music-player
+   docker run -e DATABASE_URL='postgresql://<user>:<password>@<host>:5432/music_app' -p 5600:5600 music-player
    ```
+   - Ensure you have a reachable PostgreSQL instance and the `music_app` database created. Example to create DB:
+     ```bash
+     createdb music_app
+     ```
 
 4. **Open your browser**
-   - Go to: http://localhost:5000
+   - Go to: http://localhost:5600
 
 ---
 

@@ -9,6 +9,9 @@ FROM python:3.10-slim AS dev
 
 WORKDIR /app
 
+# System deps for psycopg2
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev && rm -rf /var/lib/apt/lists/*
+
 # Install Flask dev tools
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
@@ -28,5 +31,6 @@ EXPOSE 5600
 # Run Flask dev server (auto-reload)
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=development
+ENV DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/music_app
 
 CMD ["flask", "run", "--host=0.0.0.0", "--port=5600"]
