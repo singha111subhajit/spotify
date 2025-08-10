@@ -31,30 +31,28 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Always fetch latest for API and dynamic requests
-  if (event.request.url.includes('/api/') || 
-      event.request.url.includes('/static/songs/') ||
-      event.request.method !== 'GET') {
-    return fetch(event.request);
+  // Always try to fetch latest from network for all GET requests
+  if (event.request.method === 'GET') {
+    event.respondWith(
+      fetch(event.request)
+        .then(networkResponse => {
+          // Optionally update cache
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, networkResponse.clone());
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          // Fallback to cache if offline
+          return caches.match(event.request);
+        })
+    );
+    return;
   }
-
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        if (response) {
-          // Try to update cache in background
-          fetch(event.request).then(newResp => {
-            if (newResp && newResp.status === 200 && newResp.type === 'basic') {
-              caches.open(CACHE_NAME).then(cache => {
-                cache.put(event.request, newResp.clone());
-              });
-            }
-          });
-          return response;
-        }
-        return fetch(event.request);
-      })
-  );
+  // For non-GET requests, just fetch from network
+  event.respondWith(fetch(event.request));
 });
 
 self.addEventListener('message', event => {
