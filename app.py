@@ -75,9 +75,13 @@ def register():
     user_id = data.get('user_id')
     password = data.get('password')
     if not username or not user_id or not password:
-        return jsonify({'error': 'Missing fields'}), 400
+        resp = jsonify({'error': 'Missing fields'})
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp, 400
     if User.query.filter_by(user_id=user_id).first():
-        return jsonify({'error': 'User ID already exists'}), 400
+        resp = jsonify({'error': 'User ID already exists'})
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp, 400
     hashed = generate_password_hash(password)
     user = User(username=username, user_id=user_id, password=hashed)
     db.session.add(user)
@@ -86,7 +90,9 @@ def register():
     playlist = Playlist(name=default_playlist_name, user_id=user.id)
     db.session.add(playlist)
     db.session.commit()
-    return jsonify({'message': 'Registered successfully'})
+    resp = jsonify({'message': 'Registered successfully'})
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -94,20 +100,30 @@ def login():
     user_id = data.get('user_id')
     password = data.get('password')
     if not user_id or not password:
-        return jsonify({'error': 'Missing fields'}), 400
+        resp = jsonify({'error': 'Missing fields'})
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp, 400
     user = User.query.filter_by(user_id=user_id).first()
     if not user or not check_password_hash(user.password, password):
-        return jsonify({'error': 'Invalid credentials'}), 401
+        resp = jsonify({'error': 'Invalid credentials'})
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp, 401
     token = create_jwt(user_id)
-    return jsonify({'token': token})
+    resp = jsonify({'token': token})
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 @app.route('/me', methods=['GET'])
 @login_required
 def me():
     user = User.query.filter_by(user_id=request.user_id).first()
     if not user:
-        return jsonify({'error': 'User not found'}), 404
-    return jsonify({'id': user.id, 'username': user.username, 'user_id': user.user_id})
+        resp = jsonify({'error': 'User not found'})
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp, 404
+    resp = jsonify({'id': user.id, 'username': user.username, 'user_id': user.user_id})
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 # --- Playlist Endpoints ---
 @app.route('/playlists', methods=['POST'])
@@ -120,10 +136,14 @@ def create_playlist():
 def get_playlists():
     user = User.query.filter_by(user_id=request.user_id).first()
     if not user:
-        return jsonify({'error': 'User not found'}), 404
+        resp = jsonify({'error': 'User not found'})
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp, 404
     playlist = Playlist.query.filter_by(user_id=user.id).first()
     playlists = [{'id': playlist.id, 'name': playlist.name}] if playlist else []
-    return jsonify({'playlists': playlists})
+    resp = jsonify({'playlists': playlists})
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 @app.route('/playlists/<int:playlist_id>/songs', methods=['POST'])
 @login_required
@@ -132,15 +152,21 @@ def add_song_to_playlist(playlist_id):
     song_id = data.get('song_id')
     song_title = data.get('song_title')
     if not song_id or not song_title:
-        return jsonify({'error': 'Missing song_id or song_title'}), 400
+        resp = jsonify({'error': 'Missing song_id or song_title'})
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp, 400
     user = User.query.filter_by(user_id=request.user_id).first()
     playlist = Playlist.query.filter_by(user_id=user.id).first() if user else None
     if not playlist:
-        return jsonify({'error': 'Default playlist not found for user'}), 404
+        resp = jsonify({'error': 'Default playlist not found for user'})
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp, 404
     song = PlaylistSong(playlist_id=playlist.id, song_id=song_id, song_title=song_title)
     db.session.add(song)
     db.session.commit()
-    return jsonify({'message': 'Song added'})
+    resp = jsonify({'message': 'Song added'})
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 @app.route('/playlists/<int:playlist_id>/songs', methods=['GET'])
 @login_required
@@ -148,12 +174,16 @@ def get_playlist_songs(playlist_id):
     user = User.query.filter_by(user_id=request.user_id).first()
     playlist = Playlist.query.filter_by(user_id=user.id).first() if user else None
     if not playlist:
-        return jsonify({'error': 'Default playlist not found for user'}), 404
+        resp = jsonify({'error': 'Default playlist not found for user'})
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp, 404
     songs = [
         {'id': s.id, 'song_id': s.song_id, 'song_title': s.song_title}
         for s in PlaylistSong.query.filter_by(playlist_id=playlist.id).all()
     ]
-    return jsonify({'songs': songs})
+    resp = jsonify({'songs': songs})
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 @app.route('/playlists/<int:playlist_id>/songs/<int:song_db_id>', methods=['DELETE'])
 @login_required
@@ -161,13 +191,19 @@ def remove_song_from_playlist(playlist_id, song_db_id):
     user = User.query.filter_by(user_id=request.user_id).first()
     playlist = Playlist.query.filter_by(user_id=user.id).first() if user else None
     if not playlist:
-        return jsonify({'error': 'Default playlist not found for user'}), 404
+        resp = jsonify({'error': 'Default playlist not found for user'})
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp, 404
     song = PlaylistSong.query.filter_by(id=song_db_id, playlist_id=playlist.id).first()
     if not song:
-        return jsonify({'error': 'Song not found in playlist'}), 404
+        resp = jsonify({'error': 'Song not found in playlist'})
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp, 404
     db.session.delete(song)
     db.session.commit()
-    return jsonify({'message': 'Song removed'})
+    resp = jsonify({'message': 'Song removed'})
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 def allowed_file(filename):
     return '.' in filename and \

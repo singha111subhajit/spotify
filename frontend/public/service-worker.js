@@ -31,43 +31,34 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Skip caching for API requests and dynamic content
+  // Always fetch latest for API and dynamic requests
   if (event.request.url.includes('/api/') || 
       event.request.url.includes('/static/songs/') ||
       event.request.method !== 'GET') {
-    return;
+    return fetch(event.request);
   }
 
   event.respondWith(
     caches.match(event.request)
       .then(response => {
-        // Return cached response if available
         if (response) {
+          // Try to update cache in background
+          fetch(event.request).then(newResp => {
+            if (newResp && newResp.status === 200 && newResp.type === 'basic') {
+              caches.open(CACHE_NAME).then(cache => {
+                cache.put(event.request, newResp.clone());
+              });
+            }
+          });
           return response;
         }
-        
-        // Fetch from network
-        return fetch(event.request).then(response => {
-          // Don't cache if response is not valid
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-          
-          // Clone the response
-          const responseToCache = response.clone();
-          
-          caches.open(CACHE_NAME)
-            .then(cache => {
-              cache.put(event.request, responseToCache);
-            });
-          
-          return response;
-        }).catch(() => {
-          // Return fallback for navigation requests
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
-          }
-        });
+        return fetch(event.request);
       })
   );
+});
+
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
