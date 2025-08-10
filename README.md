@@ -45,3 +45,6 @@
 ---
 
 **Enjoy your music! 🎵**
+
+access db:-
+psql -h localhost -p 5433 -U urbuser -d urbdb
