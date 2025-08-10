@@ -1098,6 +1098,7 @@ function App() {
             showToast={showToast}
             songs={songs}
             handleLogout={handleLogout}
+            handleRemoveSongFromPlaylist={handleRemoveSongFromPlaylist}
           />
         ) : null}
         {/* No add-to-playlist modal needed for single playlist */}

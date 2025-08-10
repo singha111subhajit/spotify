@@ -16,6 +16,7 @@ function Playlist({
   showToast,
   handleLogout,
   songs = [], // Pass songs from App.js for full details
+  handleRemoveSongFromPlaylist,
 }) {
   // Helper to format time
   const formatTime = (seconds) => {
@@ -44,20 +45,21 @@ function Playlist({
                 return (
                   <div key={song.id} style={{
                     display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #232323', cursor: 'pointer', background: isPlaylistMode && playlistPlayIndex === index ? 'var(--spotify-green)' : 'transparent', color: isPlaylistMode && playlistPlayIndex === index ? '#fff' : 'var(--text-main)'
-                  }}
-                    onClick={() => handlePlaylistSongSelect(displaySong, index)}
-                  >
+                  }}>
                     {/* Thumbnail */}
-                    {displaySong.thumbnail ? (
-                      <img src={displaySong.thumbnail} alt="thumb" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover', boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }} />
-                    ) : (
-                      <span style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: '#232323', borderRadius: 6, color: '#1db954' }}>🎵</span>
-                    )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: '1em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displaySong.title || displaySong.song_title || 'Unknown Title'}</div>
-                      <div style={{ fontSize: '0.92em', color: isPlaylistMode && playlistPlayIndex === index ? '#e0ffe0' : '#b3b3b3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displaySong.artist || ''}</div>
+                    <div onClick={() => handlePlaylistSongSelect(displaySong, index)} style={{display: 'flex', alignItems: 'center', flex: 1, gap: 10, cursor: 'pointer'}}>
+                      {displaySong.thumbnail ? (
+                        <img src={displaySong.thumbnail} alt="thumb" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover', boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }} />
+                      ) : (
+                        <span style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: '#232323', borderRadius: 6, color: '#1db954' }}>🎵</span>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: '1em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displaySong.title || displaySong.song_title || 'Unknown Title'}</div>
+                        <div style={{ fontSize: '0.92em', color: isPlaylistMode && playlistPlayIndex === index ? '#e0ffe0' : '#b3b3b3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displaySong.artist || ''}</div>
+                      </div>
+                      <div style={{ fontSize: '0.9em', color: isPlaylistMode && playlistPlayIndex === index ? '#e0ffe0' : '#b3b3b3', minWidth: 40, textAlign: 'right' }}>{displaySong.duration ? formatTime(displaySong.duration) : ''}</div>
                     </div>
-                    <div style={{ fontSize: '0.9em', color: isPlaylistMode && playlistPlayIndex === index ? '#e0ffe0' : '#b3b3b3', minWidth: 40, textAlign: 'right' }}>{displaySong.duration ? formatTime(displaySong.duration) : ''}</div>
+                    <button onClick={() => handleRemoveSongFromPlaylist(song.id)} style={{ background: '#b71c1c', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 500, cursor: 'pointer', marginLeft: 6 }}>Remove</button>
                   </div>
                 );
               })}
