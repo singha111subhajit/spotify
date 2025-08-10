@@ -547,7 +547,6 @@ function App() {
       setPage(1);
       setTotalPages(Math.ceil(response.data.total / 20));
       setHasMore(response.data.songs.length > 0 && response.data.total > response.data.songs.length);
-      
       // FIXED: Only set current song if there's no song currently playing
       if (response.data.songs.length > 0 && !currentSong) {
         setCurrentSong(response.data.songs[0]);
@@ -563,6 +562,7 @@ function App() {
     } catch (error) {
       console.error('Search error:', error);
       setError('Search failed. Please try again.');
+      showToast('Search failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
