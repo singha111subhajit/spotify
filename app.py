@@ -6,8 +6,7 @@ import requests
 import random
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, TIT2, TPE1, TALB, TDRC, TYER, ID3NoHeaderError
-import psycopg2
-import psycopg2.extras
+from models import db, User, Playlist, PlaylistSong
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
@@ -29,46 +28,15 @@ JWT_SECRET = 'supersecretkey'
 JWT_ALGO = 'HS256'
 JWT_EXP_DELTA_SECONDS = 7 * 24 * 3600  # 7 days
 
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/music_app')
+import dotenv
+dotenv.load_dotenv()
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://postgres:1408@localhost:5432/music_app_db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db.init_app(app)
 
-def get_db():
-    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-    return conn
-
-def init_db():
-    try:
-        conn = get_db()
-        c = conn.cursor()
-        # User table (renamed to avoid reserved keyword "user")
-        c.execute('''CREATE TABLE IF NOT EXISTS app_user (
-            id SERIAL PRIMARY KEY,
-            username TEXT NOT NULL,
-            user_id TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL
-        )''')
-        # Playlist table
-        c.execute('''CREATE TABLE IF NOT EXISTS playlist (
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL,
-            user_id INTEGER NOT NULL REFERENCES app_user(id)
-        )''')
-        # PlaylistSong table
-        c.execute('''CREATE TABLE IF NOT EXISTS playlistsong (
-            id SERIAL PRIMARY KEY,
-            playlist_id INTEGER NOT NULL REFERENCES playlist(id),
-            song_id TEXT NOT NULL,
-            song_title TEXT NOT NULL
-        )''')
-        conn.commit()
-    except Exception as e:
-        print(f"Warning: Database initialization failed: {e}")
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
-
-init_db()
+# Create tables if not exist
+with app.app_context():
+    db.create_all()
 
 # --- JWT Auth Helpers ---
 def create_jwt(user_id):
@@ -108,19 +76,16 @@ def register():
     password = data.get('password')
     if not username or not user_id or not password:
         return jsonify({'error': 'Missing fields'}), 400
-    conn = get_db()
-    c = conn.cursor()
-    c.execute('SELECT id FROM app_user WHERE user_id = %s', (user_id,))
-    if c.fetchone():
+    if User.query.filter_by(user_id=user_id).first():
         return jsonify({'error': 'User ID already exists'}), 400
     hashed = generate_password_hash(password)
-    c.execute('INSERT INTO app_user (username, user_id, password) VALUES (%s, %s, %s) RETURNING id', (username, user_id, hashed))
-    user_db_id = c.fetchone()['id']
-    # Create default playlist for user
+    user = User(username=username, user_id=user_id, password=hashed)
+    db.session.add(user)
+    db.session.commit()
     default_playlist_name = f"{username} - playlist"
-    c.execute('INSERT INTO playlist (name, user_id) VALUES (%s, %s)', (default_playlist_name, user_db_id))
-    conn.commit()
-    conn.close()
+    playlist = Playlist(name=default_playlist_name, user_id=user.id)
+    db.session.add(playlist)
+    db.session.commit()
     return jsonify({'message': 'Registered successfully'})
 
 @app.route('/login', methods=['POST'])
@@ -130,11 +95,8 @@ def login():
     password = data.get('password')
     if not user_id or not password:
         return jsonify({'error': 'Missing fields'}), 400
-    conn = get_db()
-    c = conn.cursor()
-    c.execute('SELECT id, password FROM app_user WHERE user_id = %s', (user_id,))
-    row = c.fetchone()
-    if not row or not check_password_hash(row['password'], password):
+    user = User.query.filter_by(user_id=user_id).first()
+    if not user or not check_password_hash(user.password, password):
         return jsonify({'error': 'Invalid credentials'}), 401
     token = create_jwt(user_id)
     return jsonify({'token': token})
@@ -142,13 +104,10 @@ def login():
 @app.route('/me', methods=['GET'])
 @login_required
 def me():
-    conn = get_db()
-    c = conn.cursor()
-    c.execute('SELECT id, username, user_id FROM app_user WHERE user_id = %s', (request.user_id,))
-    row = c.fetchone()
-    if not row:
+    user = User.query.filter_by(user_id=request.user_id).first()
+    if not user:
         return jsonify({'error': 'User not found'}), 404
-    return jsonify({'id': row['id'], 'username': row['username'], 'user_id': row['user_id']})
+    return jsonify({'id': user.id, 'username': user.username, 'user_id': user.user_id})
 
 # --- Playlist Endpoints ---
 @app.route('/playlists', methods=['POST'])
@@ -159,18 +118,11 @@ def create_playlist():
 @app.route('/playlists', methods=['GET'])
 @login_required
 def get_playlists():
-    conn = get_db()
-    c = conn.cursor()
-    c.execute('SELECT id FROM app_user WHERE user_id = %s', (request.user_id,))
-    user_row = c.fetchone()
-    if not user_row:
+    user = User.query.filter_by(user_id=request.user_id).first()
+    if not user:
         return jsonify({'error': 'User not found'}), 404
-    user_db_id = user_row['id']
-    # Only return the default playlist
-    c.execute('SELECT id, name FROM playlist WHERE user_id = %s LIMIT 1', (user_db_id,))
-    row = c.fetchone()
-    playlists = [{'id': row['id'], 'name': row['name']}] if row else []
-    conn.close()
+    playlist = Playlist.query.filter_by(user_id=user.id).first()
+    playlists = [{'id': playlist.id, 'name': playlist.name}] if playlist else []
     return jsonify({'playlists': playlists})
 
 @app.route('/playlists/<int:playlist_id>/songs', methods=['POST'])
@@ -181,49 +133,40 @@ def add_song_to_playlist(playlist_id):
     song_title = data.get('song_title')
     if not song_id or not song_title:
         return jsonify({'error': 'Missing song_id or song_title'}), 400
-    conn = get_db()
-    c = conn.cursor()
-    # Find user's default playlist
-    c.execute('SELECT p.id FROM playlist p JOIN app_user u ON p.user_id = u.id WHERE u.user_id = %s LIMIT 1', (request.user_id,))
-    row = c.fetchone()
-    if not row:
+    user = User.query.filter_by(user_id=request.user_id).first()
+    playlist = Playlist.query.filter_by(user_id=user.id).first() if user else None
+    if not playlist:
         return jsonify({'error': 'Default playlist not found for user'}), 404
-    playlist_id = row['id']
-    c.execute('INSERT INTO playlistsong (playlist_id, song_id, song_title) VALUES (%s, %s, %s)', (playlist_id, song_id, song_title))
-    conn.commit()
-    conn.close()
+    song = PlaylistSong(playlist_id=playlist.id, song_id=song_id, song_title=song_title)
+    db.session.add(song)
+    db.session.commit()
     return jsonify({'message': 'Song added'})
 
 @app.route('/playlists/<int:playlist_id>/songs', methods=['GET'])
 @login_required
 def get_playlist_songs(playlist_id):
-    conn = get_db()
-    c = conn.cursor()
-    # Find user's default playlist
-    c.execute('SELECT p.id FROM playlist p JOIN app_user u ON p.user_id = u.id WHERE u.user_id = %s LIMIT 1', (request.user_id,))
-    row = c.fetchone()
-    if not row:
+    user = User.query.filter_by(user_id=request.user_id).first()
+    playlist = Playlist.query.filter_by(user_id=user.id).first() if user else None
+    if not playlist:
         return jsonify({'error': 'Default playlist not found for user'}), 404
-    playlist_id = row['id']
-    c.execute('SELECT id, song_id, song_title FROM playlistsong WHERE playlist_id = %s', (playlist_id,))
-    songs = [{'id': row['id'], 'song_id': row['song_id'], 'song_title': row['song_title']} for row in c.fetchall()]
-    conn.close()
+    songs = [
+        {'id': s.id, 'song_id': s.song_id, 'song_title': s.song_title}
+        for s in PlaylistSong.query.filter_by(playlist_id=playlist.id).all()
+    ]
     return jsonify({'songs': songs})
 
 @app.route('/playlists/<int:playlist_id>/songs/<int:song_db_id>', methods=['DELETE'])
 @login_required
 def remove_song_from_playlist(playlist_id, song_db_id):
-    conn = get_db()
-    c = conn.cursor()
-    # Find user's default playlist
-    c.execute('SELECT p.id FROM playlist p JOIN app_user u ON p.user_id = u.id WHERE u.user_id = %s LIMIT 1', (request.user_id,))
-    row = c.fetchone()
-    if not row:
+    user = User.query.filter_by(user_id=request.user_id).first()
+    playlist = Playlist.query.filter_by(user_id=user.id).first() if user else None
+    if not playlist:
         return jsonify({'error': 'Default playlist not found for user'}), 404
-    playlist_id = row['id']
-    c.execute('DELETE FROM playlistsong WHERE id = %s AND playlist_id = %s', (song_db_id, playlist_id))
-    conn.commit()
-    conn.close()
+    song = PlaylistSong.query.filter_by(id=song_db_id, playlist_id=playlist.id).first()
+    if not song:
+        return jsonify({'error': 'Song not found in playlist'}), 404
+    db.session.delete(song)
+    db.session.commit()
     return jsonify({'message': 'Song removed'})
 
 def allowed_file(filename):

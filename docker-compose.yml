@@ -18,8 +18,8 @@ services:
 
   app:
     build: .
-    environment:
-      DATABASE_URL: postgresql://music:music@db:5432/music_app
+    env_file:
+      - .flaskenv
     depends_on:
       db:
         condition: service_healthy

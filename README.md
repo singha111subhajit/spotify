@@ -47,4 +47,12 @@
 **Enjoy your music! 🎵**
 
 access db:-
-psql -h localhost -p 5433 -U urbuser -d urbdb
+psql -h localhost -p 5432 -U music -d music_app
+
+## Database Migration to https://supabase.com/
+I am using github singha111subhajit account here
+1. **Create a Supabase project**
+   dbpass:Smouli@1408     
+   we can directly connect from local terminal with this dbpass like>
+   
+   terminal cmd>psql "postgresql://postgres:Smouli%401408@db.yvvslzdprrskzxurbcmi.supabase.co:5432/postgres"
