@@ -63,6 +63,7 @@ function Playlist({
             </div>
           </>
         )}
+        <button onClick={() => { setPlaylistSidebarOpen(false); if (typeof window !== 'undefined' && window.location) window.location.reload(); }} style={{ marginTop: 16, width: '100%', background: '#232323', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 0', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Logout</button>
       </div>
     </div>
   );
