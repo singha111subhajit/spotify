@@ -30,10 +30,10 @@ COPY frontend/public/service-worker.js ./static/service-worker.js
 
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
-# Placeholder - override at deploy time
-ENV DATABASE_URL=postgresql://postgres:Smouli%401408@db.yvvslzdprrskzxurbcmi.supabase.co:5432/postgres
 
 EXPOSE 5600
 
 # Use gunicorn for production WSGI serving
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5600", "app:app"]
+# CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5600", "app:app"]
+CMD flask db upgrade && gunicorn -w 4 -b 0.0.0.0:5600 app:app
+
