@@ -54,5 +54,35 @@ I am using github singha111subhajit account here
 1. **Create a Supabase project**
    dbpass:Smouli@1408     
    we can directly connect from local terminal with this dbpass like>
-   
+
    terminal cmd>psql "postgresql://postgres:Smouli%401408@db.yvvslzdprrskzxurbcmi.supabase.co:5432/postgres"
+
+
+
+## Database Migration & Production Setup
+
+**For Supabase, Render, or any cloud PostgreSQL:**
+
+1. **Set your DATABASE_URL environment variable**
+   - Use the full connection string provided by your cloud provider (e.g. Supabase, Render).
+   - Example: `DATABASE_URL=postgresql://user:password@host:5432/dbname`
+   - Set this in `.flaskenv` for local dev, and in your cloud dashboard for deployment.
+
+2. **Run migrations with Flask-Migrate**
+   - Initialize migrations:
+     ```bash
+     flask db init
+     flask db migrate -m "Initial migration"
+     flask db upgrade
+     ```
+   - Commit the `migrations/` folder to your repo.
+   - On Render/Supabase, add `flask db upgrade` to your build/start command to apply migrations automatically.
+
+3. **Do NOT use `db.create_all()` in production.**
+   - Only use migrations for schema management.
+
+4. **Connecting to your database from terminal:**
+   - Example:
+     ```bash
+     psql "postgresql://user:password@host:5432/dbname"
+     ```

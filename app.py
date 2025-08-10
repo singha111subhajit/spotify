@@ -34,10 +34,6 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
-# Create tables if not exist
-with app.app_context():
-    db.create_all()
-
 # --- JWT Auth Helpers ---
 def create_jwt(user_id):
     payload = {
