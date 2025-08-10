@@ -86,3 +86,4 @@ I am using github singha111subhajit account here
      ```bash
      psql "postgresql://user:password@host:5432/dbname"
      ```
+5.using uptime monitor tool to create frequent api call to make render alive

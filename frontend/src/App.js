@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import './App.css';
 import AudioPlayer from './components/AudioPlayer';
+import Playlist from './components/Playlist';
 
 // API base URL for backend (set via env in production)
 const API_BASE = process.env.REACT_APP_API_BASE || '';
@@ -1062,51 +1063,6 @@ function App() {
   );
 
   // Playlist Sidebar (function component, not affected by player state)
-  const PlaylistSidebar = React.memo(function PlaylistSidebar() {
-    return (
-      <div className="playlist-sidebar-backdrop" onClick={() => setPlaylistSidebarOpen(false)}>
-        <div className="playlist-sidebar" onClick={e => e.stopPropagation()}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <h2 style={{ margin: 0 }}>My Playlist</h2>
-            <button onClick={() => setPlaylistSidebarOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', marginLeft: 8 }} title="Close">✖</button>
-          </div>
-          {playlistError && <div style={{ color: 'red', marginBottom: 8 }}>{playlistError}</div>}
-          {playlistLoading ? <div>Loading...</div> : !playlist ? <div>No playlist found</div> : (
-            <>
-              <h3 style={{margin: 0, fontSize: '1.1em', color: 'var(--spotify-green)'}}>{playlist.name}</h3>
-              <div style={{ maxHeight: 320, overflowY: 'auto', marginTop: 10 }}>
-                {playlistSongs.length === 0 ? <div style={{color:'#aaa'}}>No songs</div> : playlistSongs.map((song, index) => {
-                  // Try to find full song info from main song list for better display
-                  const fullSong = songs.find(s => s.id === song.song_id);
-                  return (
-                    <div key={song.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #232323', cursor: 'pointer', background: currentSong?.id === song.song_id ? 'var(--spotify-green)' : 'transparent', color: currentSong?.id === song.song_id ? '#fff' : 'var(--text-main)'
-                    }}
-                      onClick={() => handlePlaylistSongSelect(fullSong || song, index)}
-                    >
-                      {/* Thumbnail */}
-                      {fullSong && fullSong.thumbnail ? (
-                        <img src={fullSong.thumbnail} alt="thumb" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover', boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }} />
-                      ) : (
-                        <span style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: '#232323', borderRadius: 6, color: '#1db954' }}>🎵</span>
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: '1em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.song_title}</div>
-                        <div style={{ fontSize: '0.92em', color: currentSong?.id === song.song_id ? '#e0ffe0' : '#b3b3b3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fullSong?.artist || ''}</div>
-                      </div>
-                      <div style={{ fontSize: '0.9em', color: currentSong?.id === song.song_id ? '#e0ffe0' : '#b3b3b3', minWidth: 40, textAlign: 'right' }}>{fullSong?.duration ? formatTime(fullSong.duration) : ''}</div>
-                      <button onClick={e => { e.stopPropagation(); handleRemoveSongFromPlaylist(song.id); }} style={{ color: '#fff', background: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', marginLeft: 8, cursor: 'pointer', fontWeight: 700, fontSize: 16 }} title="Remove from playlist">−</button>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-          <button onClick={handleLogout} style={{ marginTop: 16, width: '100%', background: '#232323', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 0', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Logout</button>
-        </div>
-      </div>
-    );
-  });
 
   return (
     <div style={styles.container}>
@@ -1127,7 +1083,22 @@ function App() {
           </p>
         </header>
         {authModalOpen && <AuthModal />}
-        {playlistSidebarOpen ? <PlaylistSidebar /> : null}
+        {playlistSidebarOpen ? (
+          <Playlist
+            playlistSidebarOpen={playlistSidebarOpen}
+            setPlaylistSidebarOpen={setPlaylistSidebarOpen}
+            playlist={playlist}
+            playlistSongs={playlistSongs}
+            playlistLoading={playlistLoading}
+            playlistError={playlistError}
+            handlePlaylistSongSelect={handlePlaylistSongSelect}
+            isPlaylistMode={isPlaylistMode}
+            playlistPlayIndex={playlistPlayIndex}
+            setPlaylistPlayIndex={setPlaylistPlayIndex}
+            showToast={showToast}
+            songs={songs}
+          />
+        ) : null}
         {/* No add-to-playlist modal needed for single playlist */}
         {toast && <div className="toast">{toast}</div>}
 
