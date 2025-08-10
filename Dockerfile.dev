@@ -31,6 +31,6 @@ EXPOSE 5600
 # Run Flask dev server (auto-reload)
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=development
-ENV DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/music_app
+ENV DATABASE_URL=postgresql://music_db_user:7FzxWwx5SA9ijPEKq6lfMzCT5qgjWr1c@dpg-d2c4a7ndiees73f96fmg-a/music_db_sabc
 
 CMD ["flask", "run", "--host=0.0.0.0", "--port=5600"]

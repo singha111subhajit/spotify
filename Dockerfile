@@ -31,7 +31,7 @@ COPY frontend/public/service-worker.js ./static/service-worker.js
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 # Placeholder - override at deploy time
-ENV DATABASE_URL=postgresql://postgres:postgres@postgres:5432/music_app
+ENV DATABASE_URL=postgresql://music_db_user:7FzxWwx5SA9ijPEKq6lfMzCT5qgjWr1c@dpg-d2c4a7ndiees73f96fmg-a/music_db_sabc
 
 EXPOSE 5600
 

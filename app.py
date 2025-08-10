@@ -30,7 +30,7 @@ JWT_EXP_DELTA_SECONDS = 7 * 24 * 3600  # 7 days
 
 import dotenv
 dotenv.load_dotenv()
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://postgres:1408@localhost:5432/music_app_db')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
