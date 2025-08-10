@@ -1097,6 +1097,7 @@ function App() {
             setPlaylistPlayIndex={setPlaylistPlayIndex}
             showToast={showToast}
             songs={songs}
+            handleLogout={handleLogout}
           />
         ) : null}
         {/* No add-to-playlist modal needed for single playlist */}
