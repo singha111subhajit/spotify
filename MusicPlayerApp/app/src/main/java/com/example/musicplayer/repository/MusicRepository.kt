@@ -6,6 +6,8 @@ import android.os.Environment
 import com.example.musicplayer.model.Playlist
 import com.example.musicplayer.model.Song
 import com.example.musicplayer.network.RetrofitProvider
+import com.example.musicplayer.network.api.PlaylistsResponse
+import com.example.musicplayer.network.api.SongsResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -16,8 +18,8 @@ import java.io.FileOutputStream
 class MusicRepository(private val context: Context) {
     private val musicApi = RetrofitProvider.getMusicApi(context)
 
-    suspend fun getSongsOnline(): List<Song> = musicApi.getSongs()
-    suspend fun getPlaylistsOnline(): List<Playlist> = musicApi.getPlaylists()
+    suspend fun getSongsOnline(): List<Song> = musicApi.getSongs().songs
+    suspend fun getPlaylistsOnline(): List<Playlist> = musicApi.getPlaylists().playlists
 
     fun getOfflineSongs(): List<File> {
         val dir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
@@ -28,11 +30,12 @@ class MusicRepository(private val context: Context) {
     suspend fun downloadSong(song: Song): File? = withContext(Dispatchers.IO) {
         val dir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: return@withContext null
         if (!dir.exists()) dir.mkdirs()
-        val targetFile = File(dir, sanitizeFilename("${song.artist}-${song.title}-${song.id}.mp3"))
+        val safeId = song.id ?: song.title
+        val targetFile = File(dir, sanitizeFilename("${song.artist}-${song.title}-${safeId}.mp3"))
         if (targetFile.exists()) return@withContext targetFile
 
         val client = OkHttpClient()
-        val request = Request.Builder().url(song.streamUrl).build()
+        val request = Request.Builder().url(song.url).build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return@withContext null
             val body = response.body ?: return@withContext null

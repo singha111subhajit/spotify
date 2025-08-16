@@ -1,16 +1,16 @@
 package com.example.musicplayer.model
 
 data class LoginRequest(
-    val email: String,
+    val user_id: String,
     val password: String
 )
 
 data class RegisterRequest(
-    val email: String,
+    val username: String,
+    val user_id: String,
     val password: String
 )
 
 data class AuthResponse(
-    val token: String,
-    val userId: String? = null
+    val token: String?
 )
