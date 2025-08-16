@@ -1,0 +1,26 @@
+<resources>
+    <string name="app_name">MusicPlayer</string>
+
+    <string name="login">Login</string>
+    <string name="register">Register</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="have_account_login">Already have an account? Login</string>
+    <string name="no_account_register">No account? Register</string>
+
+    <string name="online">Online</string>
+    <string name="offline">Offline</string>
+    <string name="playlists">Playlists</string>
+    <string name="songs">Songs</string>
+    <string name="download">Download</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="next">Next</string>
+    <string name="previous">Previous</string>
+    <string name="shuffle">Shuffle</string>
+    <string name="repeat">Repeat</string>
+    <string name="logout">Logout</string>
+
+    <string name="notification_channel_name">Music Playback</string>
+    <string name="notification_channel_desc">Playback controls and state</string>
+</resources>
