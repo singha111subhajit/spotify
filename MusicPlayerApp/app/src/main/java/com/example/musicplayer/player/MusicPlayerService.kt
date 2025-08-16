@@ -33,7 +33,7 @@ class MusicPlayerService : Service() {
         player = ExoPlayer.Builder(this).build().apply {
             val audioAttr = AudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA)
-                .setContentType(C.CONTENT_TYPE_MUSIC)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
                 .build()
             setAudioAttributes(audioAttr, true)
         }
