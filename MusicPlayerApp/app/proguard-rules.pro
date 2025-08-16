@@ -1,6 +1,5 @@
-# Keep ExoPlayer classes used by reflection
--keep class com.google.android.exoplayer2.** { *; }
--keep class com.google.android.exoplayer2.ext.mediasession.** { *; }
+# Keep Media3 classes used by reflection
+-keep class androidx.media3.** { *; }
 
 # Retrofit/Gson model classes
 -keep class com.example.musicplayer.model.** { *; }
