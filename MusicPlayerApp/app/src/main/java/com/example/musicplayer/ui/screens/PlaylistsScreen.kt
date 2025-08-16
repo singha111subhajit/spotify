@@ -42,7 +42,7 @@ fun PlaylistsScreen(nav: NavController) {
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(pl.name, style = MaterialTheme.typography.titleMedium)
-                            Text("${'$'}{pl.songs.size} songs", style = MaterialTheme.typography.bodyMedium)
+                            Text("Playlist", style = MaterialTheme.typography.bodyMedium)
                         }
                         TextButton(onClick = { nav.navigate("online") }) { Text("Open") }
                     }
