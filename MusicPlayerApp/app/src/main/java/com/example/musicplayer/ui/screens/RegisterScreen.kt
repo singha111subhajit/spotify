@@ -36,7 +36,7 @@ fun RegisterScreen(nav: NavController) {
                 scope.launch {
                     try {
                         repo.register(username, userId, password)
-                        nav.navigate("playlists") { popUpTo("register") { inclusive = true } }
+                        nav.navigate("main") { popUpTo("register") { inclusive = true } }
                     } catch (e: Exception) {
                         error = e.message
                     } finally { isLoading = false }

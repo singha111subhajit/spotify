@@ -23,7 +23,7 @@ fun LoginScreen(nav: NavController) {
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        if (repo.isLoggedIn()) nav.navigate("playlists") { popUpTo("login") { inclusive = true } }
+        if (repo.isLoggedIn()) nav.navigate("main") { popUpTo("login") { inclusive = true } }
     }
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -38,7 +38,7 @@ fun LoginScreen(nav: NavController) {
                 scope.launch {
                     try {
                         repo.login(userId, password)
-                        nav.navigate("playlists") { popUpTo("login") { inclusive = true } }
+                        nav.navigate("main") { popUpTo("login") { inclusive = true } }
                     } catch (e: Exception) {
                         error = e.message
                     } finally { isLoading = false }
