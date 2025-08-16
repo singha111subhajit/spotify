@@ -35,3 +35,15 @@ Thumbs.db
 *.tmp
 *.temp
 *.log
+
+# Node
+node_modules/
+*.log
+
+# Android Studio/Gradle (for MusicPlayerApp)
+/.idea/
+.gradle/
+/local.properties
+**/build/
+**/.DS_Store
+**/Thumbs.db

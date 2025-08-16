@@ -1,47 +1,28 @@
-# Music Player Web App (Minimal Docker Guide)
+# Music Platform: Flask Backend + Android App
 
-## Quick Start with Docker
+## Contents
+- Flask backend (`app.py`, `templates/`, `static/`)
+- Android app (Kotlin/Compose/ExoPlayer) in `MusicPlayerApp/`
 
-1. **Clone this repository**
-   ```bash
-   git clone <repository-url>
-   cd <project-folder>
-   ```
+## Backend (Flask)
+- Run with Docker Compose (includes PostgreSQL):
+```bash
+docker compose up -d --build
+```
+- App: http://localhost:5600
+- Postgres: localhost:5432 (user: `music`, password: `music`, db: `music_app`)
 
-2. **Add your music files**
-   - Place your MP3 files in the `static/songs/` directory.
+Run locally without Docker:
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+export FLASK_APP=app.py FLASK_ENV=development DATABASE_URL="postgresql://music:music@localhost:5432/music_app"
+flask run -h 0.0.0.0 -p 5600
+```
 
-3. **Build and run with Docker**
-   ```bash
-   docker build -t music-player .
-   docker run -e DATABASE_URL='postgresql://<user>:<password>@<host>:5432/music_app' -p 5600:5600 music-player
-   ```
-   - Ensure you have a reachable PostgreSQL instance and the `music_app` database created. Example to create DB:
-     ```bash
-     createdb music_app
-     ```
+## Android App
+- Open `MusicPlayerApp/` in Android Studio
+- Set backend base URL in `app/src/main/java/com/example/musicplayer/config/ApiConfig.kt`
+- Run on device/emulator
 
-4. **Open your browser**
-   - Go to: http://localhost:5600
-
----
-
-## Run with Docker Compose (includes PostgreSQL)
-
-1. **Start services**
-   ```bash
-   docker compose up -d --build
-   ```
-
-2. **Verify**
-   - App: http://localhost:5600
-   - Postgres: localhost:5432 (user: `music`, password: `music`, db: `music_app`)
-
-3. **Stop services**
-   ```bash
-   docker compose down
-   ```
-
----
-
-**Enjoy your music! 🎵**
+Distribution: build a signed APK in Android Studio and host on your website.
