@@ -46,7 +46,7 @@ fun PlaylistsScreen(nav: NavController) {
                         }
                         TextButton(onClick = { nav.navigate("online") }) { Text("Open") }
                     }
-                    Divider()
+                    HorizontalDivider()
                 }
             }
         }

@@ -43,7 +43,7 @@ fun OfflineScreen(nav: NavController) {
                             nav.navigate("player")
                         }) { Text("Play") }
                     }
-                    Divider()
+                    HorizontalDivider()
                 }
             }
         }

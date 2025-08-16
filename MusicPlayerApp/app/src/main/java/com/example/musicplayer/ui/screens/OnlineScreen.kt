@@ -65,7 +65,7 @@ fun OnlineScreen(nav: NavController) {
                             }) { Text("Download") }
                         }
                     }
-                    Divider()
+                    HorizontalDivider()
                 }
             }
         }
