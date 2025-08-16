@@ -11,14 +11,14 @@ class AuthRepository(context: Context) {
     private val authApi = RetrofitProvider.getAuthApi(context)
     private val tokenStorage = TokenStorage.getInstance(context)
 
-    suspend fun login(email: String, password: String): AuthResponse {
-        val response = authApi.login(LoginRequest(email, password))
+    suspend fun login(userId: String, password: String): AuthResponse {
+        val response = authApi.login(LoginRequest(user_id = userId, password = password))
         tokenStorage.setToken(response.token)
         return response
     }
 
-    suspend fun register(email: String, password: String): AuthResponse {
-        val response = authApi.register(RegisterRequest(email, password))
+    suspend fun register(username: String, userId: String, password: String): AuthResponse {
+        val response = authApi.register(RegisterRequest(username = username, user_id = userId, password = password))
         tokenStorage.setToken(response.token)
         return response
     }

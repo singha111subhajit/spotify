@@ -16,7 +16,8 @@ import androidx.compose.ui.platform.LocalContext
 fun RegisterScreen(nav: NavController) {
     val context = LocalContext.current
     val repo = remember { AuthRepository(context) }
-    var email by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+    var userId by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -25,7 +26,8 @@ fun RegisterScreen(nav: NavController) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(text = "Register", style = MaterialTheme.typography.headlineMedium)
-            OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") })
+            OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username") })
+            OutlinedTextField(value = userId, onValueChange = { userId = it }, label = { Text("User ID") })
             OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, visualTransformation = PasswordVisualTransformation())
             if (error != null) Text(text = error!!, color = MaterialTheme.colorScheme.error)
             Button(onClick = {
@@ -33,7 +35,7 @@ fun RegisterScreen(nav: NavController) {
                 error = null
                 scope.launch {
                     try {
-                        repo.register(email, password)
+                        repo.register(username, userId, password)
                         nav.navigate("playlists") { popUpTo("register") { inclusive = true } }
                     } catch (e: Exception) {
                         error = e.message

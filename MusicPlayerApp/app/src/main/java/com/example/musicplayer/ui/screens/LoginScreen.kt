@@ -16,7 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 fun LoginScreen(nav: NavController) {
     val context = LocalContext.current
     val repo = remember { AuthRepository(context) }
-    var email by remember { mutableStateOf("") }
+    var userId by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -29,7 +29,7 @@ fun LoginScreen(nav: NavController) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(text = "Login", style = MaterialTheme.typography.headlineMedium)
-            OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") })
+            OutlinedTextField(value = userId, onValueChange = { userId = it }, label = { Text("User ID") })
             OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, visualTransformation = PasswordVisualTransformation())
             if (error != null) Text(text = error!!, color = MaterialTheme.colorScheme.error)
             Button(onClick = {
@@ -37,7 +37,7 @@ fun LoginScreen(nav: NavController) {
                 error = null
                 scope.launch {
                     try {
-                        repo.login(email, password)
+                        repo.login(userId, password)
                         nav.navigate("playlists") { popUpTo("login") { inclusive = true } }
                     } catch (e: Exception) {
                         error = e.message
