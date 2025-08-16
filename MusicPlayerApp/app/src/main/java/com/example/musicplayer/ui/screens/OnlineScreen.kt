@@ -52,7 +52,7 @@ fun OnlineScreen(nav: NavController) {
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             TextButton(onClick = {
-                                MusicPlayerService.startPlayUrl(context, song.streamUrl)
+                                MusicPlayerService.startPlayUrl(context, song.url)
                                 nav.navigate("player")
                             }) { Text("Play") }
                             OutlinedButton(onClick = {

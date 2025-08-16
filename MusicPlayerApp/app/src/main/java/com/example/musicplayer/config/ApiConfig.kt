@@ -2,5 +2,6 @@ package com.example.musicplayer.config
 
 object ApiConfig {
     // Set this to your backend base URL, must end with '/'
-    const val BASE_URL: String = "https://your-backend.example.com/"
+    // For emulator: http://10.0.2.2:5600/  | For device: http://<PC-LAN-IP>:5600/
+    const val BASE_URL: String = "http://10.0.2.2:5600/"
 }

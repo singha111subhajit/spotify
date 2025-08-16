@@ -1,15 +1,14 @@
 package com.example.musicplayer.model
 
 data class Song(
-    val id: String,
+    val id: String?,
     val title: String,
     val artist: String,
-    val artworkUrl: String?,
-    val streamUrl: String
+    val url: String,
+    val thumbnail: String? = null
 )
 
 data class Playlist(
-    val id: String,
-    val name: String,
-    val songs: List<Song> = emptyList()
+    val id: Int,
+    val name: String
 )

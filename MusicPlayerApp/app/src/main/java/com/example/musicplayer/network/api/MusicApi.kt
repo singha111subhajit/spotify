@@ -4,10 +4,13 @@ import com.example.musicplayer.model.Playlist
 import com.example.musicplayer.model.Song
 import retrofit2.http.GET
 
+data class SongsResponse(val songs: List<Song>)
+data class PlaylistsResponse(val playlists: List<Playlist>)
+
 interface MusicApi {
-    @GET("songs")
-    suspend fun getSongs(): List<Song>
+    @GET("api/songs")
+    suspend fun getSongs(): SongsResponse
 
     @GET("playlists")
-    suspend fun getPlaylists(): List<Playlist>
+    suspend fun getPlaylists(): PlaylistsResponse
 }
