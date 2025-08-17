@@ -1094,19 +1094,31 @@ def api_artists():
 
 @app.route('/api/albums')
 def api_albums():
-    """Get list of all albums"""
+    """Get list of albums (from JioSaavn only, multiple pages/queries)"""
     try:
-        static_songs = get_static_songs()
-        popular_songs = get_popular_songs(20)
-        all_songs = static_songs + popular_songs
-        
+        all_songs = []
+        queries = ["top", "hits", "party", "love"]
+        for q in queries:
+            for page in range(1, 3):  # 2 pages per query
+                try:
+                    jio_songs, _ = search_jiosaavn(q, page=page, per_page=20)
+                    for s in jio_songs:
+                        if s.get('url'):
+                            s['url'] = upgrade_url(s['url'])
+                        if s.get('thumbnail'):
+                            s['thumbnail'] = upgrade_url(s['thumbnail'])
+                    all_songs.extend(jio_songs)
+                except Exception as e:
+                    print(f"Warning: failed to fetch JioSaavn albums for {q} page {page}: {e}")
+
+        # --- same album aggregation logic as before ---
         albums = {}
         for song in all_songs:
             album = song.get('album') or 'Unknown Album'
             if album not in albums:
                 albums[album] = {
                     'name': album,
-                    'artist': song['artist'],
+                    'artist': song.get('artist') or 'Unknown Artist',
                     'year': song.get('year'),
                     'songs': [],
                     'duration': 0
@@ -1114,14 +1126,13 @@ def api_albums():
             albums[album]['songs'].append(song)
             if song.get('duration'):
                 albums[album]['duration'] += song['duration']
-        
-        # Convert to list and add metadata
+
         album_list = []
         for album_name, album_data in albums.items():
             album_data['song_count'] = len(album_data['songs'])
             album_data['id'] = f"album-{len(album_list)}"
             album_list.append(album_data)
-        
+
         return jsonify({
             'albums': album_list,
             'total': len(album_list)
