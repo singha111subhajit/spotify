@@ -21,6 +21,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.AudioAttributes
+import androidx.media3.common.PlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
@@ -60,6 +61,9 @@ class MusicPlayerService : Service() {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 PlaybackStateHolder.update(isPlaying = isPlaying)
                 if (isPlaying) startTicker() else stopTicker()
+            }
+            override fun onPlayerError(error: PlaybackException) {
+                Log.e(TAG, "ExoPlayer error: ${'$'}{error.errorCodeName}", error)
             }
         })
         createNotificationChannel()
