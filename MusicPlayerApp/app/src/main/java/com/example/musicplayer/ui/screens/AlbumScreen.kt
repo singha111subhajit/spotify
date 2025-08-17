@@ -3,10 +3,11 @@ package com.example.musicplayer.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.musicplayer.network.RetrofitProvider
@@ -30,7 +31,11 @@ fun AlbumScreen(rootNav: NavController, albumName: String) {
         loading = false
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text(albumName) }) }) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text(albumName) }, navigationIcon = {
+        IconButton(onClick = { rootNav.popBackStack() }) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+        }
+    }) }) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             LazyColumn(Modifier.fillMaxSize()) {

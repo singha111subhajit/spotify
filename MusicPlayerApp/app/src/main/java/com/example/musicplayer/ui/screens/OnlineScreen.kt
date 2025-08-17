@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -15,12 +17,14 @@ import com.example.musicplayer.player.MusicPlayerService
 import com.example.musicplayer.repository.MusicRepository
 import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
+import com.example.musicplayer.repository.AuthRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnlineScreen(rootNav: NavController) {
     val context = LocalContext.current
     val repo = remember { MusicRepository(context) }
+    val authRepo = remember { AuthRepository(context) }
     var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -36,7 +40,6 @@ fun OnlineScreen(rootNav: NavController) {
         runCatching { repo.getSongsOnline() }
             .onSuccess { songs = it }
             .onFailure { error = it.message }
-        // Fetch default playlist
         runCatching { repo.getPlaylistsOnline() }.onSuccess { pls ->
             val pid = pls.firstOrNull()?.id
             defaultPlaylistId = pid
@@ -50,8 +53,15 @@ fun OnlineScreen(rootNav: NavController) {
 
     LaunchedEffect(Unit) { load() }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Home") }, actions = {
-        TextButton(onClick = { scope.launch { load() } }) { Text("Refresh") }
+    Scaffold(topBar = { TopAppBar(title = { Text("Songs") }, navigationIcon = {
+        IconButton(onClick = { rootNav.popBackStack() }) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+        }
+    }, actions = {
+        TextButton(onClick = {
+            authRepo.logout()
+            rootNav.navigate("login") { popUpTo("main") { inclusive = true } }
+        }) { Text("Logout") }
     }) }, snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (isLoading) {
@@ -84,7 +94,6 @@ fun OnlineScreen(rootNav: NavController) {
                                     if (inPlaylist) {
                                         OutlinedButton(onClick = {
                                             scope.launch {
-                                                // Find song by id in playlist and remove
                                                 val psongs = repo.getPlaylistSongs(pid)
                                                 val toRemove = psongs.find { it.song_id == (song.id ?: song.title) }
                                                 if (toRemove != null) {

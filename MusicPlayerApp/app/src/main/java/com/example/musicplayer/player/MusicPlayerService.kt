@@ -26,10 +26,17 @@ import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import java.net.URL
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 class MusicPlayerService : Service() {
     private lateinit var player: ExoPlayer
     private lateinit var mediaSession: MediaSessionCompat
+    private var tickerJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -50,6 +57,12 @@ class MusicPlayerService : Service() {
                 override fun onStop() { stopSelf() }
             })
         }
+        player.addListener(object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                PlaybackStateHolder.update(isPlaying = isPlaying)
+                if (isPlaying) startTicker() else stopTicker()
+            }
+        })
         createNotificationChannel()
     }
 
@@ -79,6 +92,13 @@ class MusicPlayerService : Service() {
                 player.repeatMode = if (player.repeatMode == Player.REPEAT_MODE_OFF) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
                 updateNotification()
             }
+            ACTION_SEEK_TO -> {
+                val pos = intent.getLongExtra(EXTRA_POSITION_MS, -1L)
+                if (pos >= 0) {
+                    player.seekTo(pos)
+                    PlaybackStateHolder.update(positionMs = pos)
+                }
+            }
         }
 
         startForeground(NOTIFICATION_ID, buildNotification())
@@ -89,6 +109,7 @@ class MusicPlayerService : Service() {
         super.onDestroy()
         mediaSession.release()
         player.release()
+        stopTicker()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -97,6 +118,7 @@ class MusicPlayerService : Service() {
         player.setMediaItems(uris.map { MediaItem.fromUri(it) }, startIndex, 0L)
         player.prepare()
         player.playWhenReady = true
+        PlaybackStateHolder.update(durationMs = player.duration)
         updatePlaybackState()
         updateNotification()
     }
@@ -106,6 +128,7 @@ class MusicPlayerService : Service() {
         player.prepare()
         player.playWhenReady = true
         updateMetadata(title, artist, artworkUrl)
+        PlaybackStateHolder.update(title = title, artist = artist, artworkUrl = artworkUrl, durationMs = player.duration)
         updatePlaybackState()
         updateNotification()
     }
@@ -123,8 +146,8 @@ class MusicPlayerService : Service() {
         mediaSession.setMetadata(builder.build())
     }
 
-    private fun pause() { player.pause(); updatePlaybackState(); updateNotification() }
-    private fun play() { player.play(); updatePlaybackState(); updateNotification() }
+    private fun pause() { player.pause(); updatePlaybackState(); updateNotification(); PlaybackStateHolder.update(isPlaying = false) }
+    private fun play() { player.play(); updatePlaybackState(); updateNotification(); PlaybackStateHolder.update(isPlaying = true) }
     private fun next() { player.seekToNextMediaItem(); updatePlaybackState(); updateNotification() }
     private fun previous() { player.seekToPreviousMediaItem(); updatePlaybackState(); updateNotification() }
 
@@ -142,6 +165,7 @@ class MusicPlayerService : Service() {
                 .setState(state, player.currentPosition, 1.0f)
                 .build()
         )
+        PlaybackStateHolder.update(positionMs = player.currentPosition, durationMs = if (player.duration > 0) player.duration else PlaybackStateHolder.uiState.value.durationMs)
     }
 
     private fun buildNotification(): Notification {
@@ -203,6 +227,21 @@ class MusicPlayerService : Service() {
         }
     }
 
+    private fun startTicker() {
+        if (tickerJob?.isActive == true) return
+        tickerJob = CoroutineScope(Dispatchers.Default).launch {
+            while (isActive) {
+                PlaybackStateHolder.update(positionMs = player.currentPosition, durationMs = if (player.duration > 0) player.duration else PlaybackStateHolder.uiState.value.durationMs)
+                delay(500)
+            }
+        }
+    }
+
+    private fun stopTicker() {
+        tickerJob?.cancel()
+        tickerJob = null
+    }
+
     companion object {
         private const val CHANNEL_ID = "music_playback"
         private const val NOTIFICATION_ID = 1001
@@ -214,12 +253,14 @@ class MusicPlayerService : Service() {
         const val ACTION_PREVIOUS = "com.example.musicplayer.action.PREVIOUS"
         const val ACTION_TOGGLE_SHUFFLE = "com.example.musicplayer.action.TOGGLE_SHUFFLE"
         const val ACTION_TOGGLE_REPEAT = "com.example.musicplayer.action.TOGGLE_REPEAT"
+        const val ACTION_SEEK_TO = "com.example.musicplayer.action.SEEK_TO"
 
         const val EXTRA_URL = "extra_url"
         const val EXTRA_FILE_PATH = "extra_file_path"
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_ARTIST = "extra_artist"
         const val EXTRA_ARTWORK = "extra_artwork"
+        const val EXTRA_POSITION_MS = "extra_position_ms"
 
         fun startPlayUrl(context: Context, url: String, title: String? = null, artist: String? = null, artworkUrl: String? = null) {
             val intent = Intent(context, MusicPlayerService::class.java).apply {
@@ -242,6 +283,14 @@ class MusicPlayerService : Service() {
 
         fun sendControl(context: Context, action: String) {
             val intent = Intent(context, MusicPlayerService::class.java).apply { this.action = action }
+            ContextCompat.startForegroundService(context, intent)
+        }
+
+        fun sendSeekTo(context: Context, positionMs: Long) {
+            val intent = Intent(context, MusicPlayerService::class.java).apply {
+                action = ACTION_SEEK_TO
+                putExtra(EXTRA_POSITION_MS, positionMs)
+            }
             ContextCompat.startForegroundService(context, intent)
         }
     }

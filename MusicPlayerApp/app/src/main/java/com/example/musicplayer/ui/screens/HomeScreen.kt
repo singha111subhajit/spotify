@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +21,7 @@ import com.example.musicplayer.model.Song
 import com.example.musicplayer.network.RetrofitProvider
 import com.example.musicplayer.network.api.Album
 import com.example.musicplayer.network.api.MusicApi
+import com.example.musicplayer.repository.AuthRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,6 +29,7 @@ fun HomeScreen(rootNav: NavController) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val retrofit = remember { RetrofitProvider.getRetrofit(context) }
     val musicApi = remember { retrofit.create(MusicApi::class.java) }
+    val authRepo = remember { AuthRepository(context) }
 
     var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
     var featured by remember { mutableStateOf<List<Song>>(emptyList()) }
@@ -43,7 +47,22 @@ fun HomeScreen(rootNav: NavController) {
         isLoading = false
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Home") }) }) { padding ->
+    Scaffold(topBar = {
+        TopAppBar(
+            title = { Text("Home") },
+            navigationIcon = {
+                IconButton(onClick = { /* root screen, do nothing or open drawer */ }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            },
+            actions = {
+                TextButton(onClick = {
+                    authRepo.logout()
+                    rootNav.navigate("login") { popUpTo("main") { inclusive = true } }
+                }) { Text("Logout") }
+            }
+        )
+    }) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().padding(16.dp)) {
             if (isLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (error != null) Text("Error: ${'$'}error", color = MaterialTheme.colorScheme.error)
