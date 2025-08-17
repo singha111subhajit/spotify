@@ -30,6 +30,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.navigation.NavController
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.padding
 
 class MainActivity : ComponentActivity() {
     private val requestPermission = registerForActivityResult(
@@ -90,7 +92,7 @@ fun MainScaffold(rootNavController: NavController) {
             }
         }
     ) { padding ->
-        NavHost(bottomNavController, startDestination = "home") {
+        NavHost(bottomNavController, startDestination = "home", modifier = Modifier.padding(padding)) {
             composable("home") { OnlineScreen(rootNavController) }
             composable("search") { SearchScreen(rootNavController) }
             composable("library") { OfflineScreen(rootNavController) }
