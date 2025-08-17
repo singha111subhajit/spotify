@@ -17,12 +17,12 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.musicplayer.R
-import com.example.musicplayer.model.Song
 import com.example.musicplayer.network.RetrofitProvider
 import com.example.musicplayer.network.api.Album
 import com.example.musicplayer.network.api.MusicApi
 import com.example.musicplayer.repository.AuthRepository
 import com.example.musicplayer.storage.SettingsStorage
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,11 +40,24 @@ fun HomeScreen(rootNav: NavController) {
     val languages = listOf("English", "Hindi", "Bengali", "Punjabi", "Tamil", "Telugu")
     var selectedLanguage by remember { mutableStateOf(settings.getLanguage()) }
 
-    fun load() {
+    val coroutineScope = rememberCoroutineScope()
+
+    suspend fun load() {
         isLoading = true
         error = null
-        val songs = runCatching { musicApi.getSongs().songs }.getOrDefault(emptyList())
-        var fetchedAlbums = runCatching { musicApi.getAlbums().albums }.getOrDefault(emptyList())
+
+        val songs = runCatching { musicApi.getSongs().songs }
+            .getOrElse {
+                error = "Failed to fetch songs"
+                emptyList()
+            }
+
+        var fetchedAlbums = runCatching { musicApi.getAlbums().albums }
+            .getOrElse {
+                error = "Failed to fetch albums"
+                emptyList()
+            }
+
         if (fetchedAlbums.isEmpty() && songs.isNotEmpty()) {
             val grouped = songs.groupBy { it.album ?: "Unknown Album" }
             fetchedAlbums = grouped.entries.mapIndexed { index, entry ->
@@ -60,50 +73,69 @@ fun HomeScreen(rootNav: NavController) {
                 )
             }
         }
+
         albums = fetchedAlbums.shuffled()
         isLoading = false
     }
 
     LaunchedEffect(Unit) { load() }
 
-    Scaffold(topBar = {
-        TopAppBar(
-            title = { Text("Home") },
-            navigationIcon = {
-                IconButton(onClick = { /* root */ }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-            },
-            actions = {
-                // Language selector
-                Box { 
-                    TextButton(onClick = { expanded = true }) { Text(selectedLanguage) }
-                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        languages.forEach { lang ->
-                            DropdownMenuItem(text = { Text(lang) }, onClick = {
-                                selectedLanguage = lang
-                                settings.setLanguage(lang)
-                                expanded = false
-                                load()
-                            })
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Home") },
+                navigationIcon = {
+                    IconButton(onClick = { /* root */ }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    Box {
+                        TextButton(onClick = { expanded = true }) { Text(selectedLanguage) }
+                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                            languages.forEach { lang ->
+                                DropdownMenuItem(text = { Text(lang) }, onClick = {
+                                    selectedLanguage = lang
+                                    settings.setLanguage(lang)
+                                    expanded = false
+                                    coroutineScope.launch { load() }
+                                })
+                            }
                         }
                     }
+                    TextButton(onClick = {
+                        authRepo.logout()
+                        rootNav.navigate("login") {
+                            popUpTo("main") { inclusive = true }
+                        }
+                    }) { Text("Logout") }
                 }
-                TextButton(onClick = {
-                    authRepo.logout()
-                    rootNav.navigate("login") { popUpTo("main") { inclusive = true } }
-                }) { Text("Logout") }
-            }
-        )
-    }) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().padding(16.dp)) {
+            )
+        }
+    ) { padding ->
+        Column(
+            Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
             if (isLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            if (error != null) Text("Error: ${'$'}error", color = MaterialTheme.colorScheme.error)
+            if (error != null) Text("Error: $error", color = MaterialTheme.colorScheme.error)
 
-            Text("Good evening", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "Good evening",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
             Spacer(Modifier.height(12.dp))
 
-            LazyVerticalGrid(columns = GridCells.Adaptive(minSize = 140.dp), contentPadding = PaddingValues(4.dp), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 140.dp),
+                contentPadding = PaddingValues(4.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
                 items(albums) { album ->
                     AlbumCard(album = album, onClick = {
                         rootNav.navigate("album/${album.name}")
@@ -116,17 +148,32 @@ fun HomeScreen(rootNav: NavController) {
 
 @Composable
 fun AlbumCard(album: Album, onClick: () -> Unit) {
-    ElevatedCard(Modifier.fillMaxWidth().clickable { onClick() }) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.Start) {
+    ElevatedCard(
+        Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    ) {
+        Column(
+            Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
             AsyncImage(
                 model = album.songs.firstOrNull()?.thumbnail,
                 contentDescription = album.name,
-                modifier = Modifier.fillMaxWidth().height(120.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
                 placeholder = painterResource(R.drawable.ic_music_note),
                 error = painterResource(R.drawable.ic_music_note)
             )
             Text(album.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-            Text(album.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            Text(
+                album.artist,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
         }
     }
 }

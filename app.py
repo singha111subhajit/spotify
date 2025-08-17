@@ -1084,26 +1084,24 @@ def api_artists():
 
 @app.route('/api/albums')
 def api_albums():
-    """Get list of all albums (static + JioSaavn-derived)"""
+    """Get list of albums (from JioSaavn only, multiple pages/queries)"""
     try:
-        static_songs = get_static_songs()
-        popular_songs = get_popular_songs(20)
-        all_songs = static_songs + popular_songs
+        all_songs = []
+        queries = ["top", "hits", "party", "love"]
+        for q in queries:
+            for page in range(1, 3):  # 2 pages per query
+                try:
+                    jio_songs, _ = search_jiosaavn(q, page=page, per_page=20)
+                    for s in jio_songs:
+                        if s.get('url'):
+                            s['url'] = upgrade_url(s['url'])
+                        if s.get('thumbnail'):
+                            s['thumbnail'] = upgrade_url(s['thumbnail'])
+                    all_songs.extend(jio_songs)
+                except Exception as e:
+                    print(f"Warning: failed to fetch JioSaavn albums for {q} page {page}: {e}")
 
-        # Try to enrich with JioSaavn albums by doing a light search for a common term
-        try:
-            # Use a generic query to fetch a variety of albums
-            jio_songs, _ = search_jiosaavn("top", page=1, per_page=20)
-            # Ensure HTTPS urls
-            for s in jio_songs:
-                if s.get('url'):
-                    s['url'] = upgrade_url(s['url'])
-                if s.get('thumbnail'):
-                    s['thumbnail'] = upgrade_url(s['thumbnail'])
-            all_songs = all_songs + jio_songs
-        except Exception as e:
-            print(f"Warning: failed to fetch JioSaavn albums seed: {e}")
-
+        # --- same album aggregation logic as before ---
         albums = {}
         for song in all_songs:
             album = song.get('album') or 'Unknown Album'
@@ -1119,7 +1117,6 @@ def api_albums():
             if song.get('duration'):
                 albums[album]['duration'] += song['duration']
 
-        # Convert to list and add metadata
         album_list = []
         for album_name, album_data in albums.items():
             album_data['song_count'] = len(album_data['songs'])
@@ -1133,6 +1130,8 @@ def api_albums():
     except Exception as e:
         print(f"Error getting albums: {e}")
         return jsonify({'error': 'Failed to get albums'}), 500
+
+
 
 @app.route('/api/stats')
 def api_stats():
