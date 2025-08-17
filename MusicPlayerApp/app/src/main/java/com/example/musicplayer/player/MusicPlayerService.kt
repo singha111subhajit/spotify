@@ -7,10 +7,10 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.media.app.NotificationCompat.MediaStyle
@@ -25,7 +25,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
-import java.net.URL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -67,42 +66,46 @@ class MusicPlayerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        MediaButtonReceiver.handleIntent(mediaSession, intent)
-
-        when (intent?.action) {
-            ACTION_PLAY_URL -> {
-                val url = intent.getStringExtra(EXTRA_URL)
-                val title = intent.getStringExtra(EXTRA_TITLE)
-                val artist = intent.getStringExtra(EXTRA_ARTIST)
-                val artwork = intent.getStringExtra(EXTRA_ARTWORK)
-                if (!url.isNullOrBlank()) playUri(Uri.parse(url), title, artist, artwork)
-            }
-            ACTION_PLAY_FILE -> {
-                val path = intent.getStringExtra(EXTRA_FILE_PATH)
-                if (!path.isNullOrBlank()) playUri(Uri.fromFile(java.io.File(path)), null, null, null)
-            }
-            ACTION_TOGGLE_PLAY_PAUSE -> if (player.isPlaying) pause() else play()
-            ACTION_NEXT -> next()
-            ACTION_PREVIOUS -> previous()
-            ACTION_TOGGLE_SHUFFLE -> {
-                player.shuffleModeEnabled = !player.shuffleModeEnabled
-                updateNotification()
-            }
-            ACTION_TOGGLE_REPEAT -> {
-                player.repeatMode = if (player.repeatMode == Player.REPEAT_MODE_OFF) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
-                updateNotification()
-            }
-            ACTION_SEEK_TO -> {
-                val pos = intent.getLongExtra(EXTRA_POSITION_MS, -1L)
-                if (pos >= 0) {
-                    player.seekTo(pos)
-                    PlaybackStateHolder.update(positionMs = pos)
+        // Start foreground immediately to comply with restrictions
+        startForeground(NOTIFICATION_ID, buildNotification())
+        return try {
+            MediaButtonReceiver.handleIntent(mediaSession, intent)
+            when (intent?.action) {
+                ACTION_PLAY_URL -> {
+                    val url = intent.getStringExtra(EXTRA_URL)
+                    val title = intent.getStringExtra(EXTRA_TITLE)
+                    val artist = intent.getStringExtra(EXTRA_ARTIST)
+                    val artwork = intent.getStringExtra(EXTRA_ARTWORK)
+                    if (!url.isNullOrBlank()) playUri(Uri.parse(url), title, artist, artwork)
+                }
+                ACTION_PLAY_FILE -> {
+                    val path = intent.getStringExtra(EXTRA_FILE_PATH)
+                    if (!path.isNullOrBlank()) playUri(Uri.fromFile(java.io.File(path)), null, null, null)
+                }
+                ACTION_TOGGLE_PLAY_PAUSE -> if (player.isPlaying) pause() else play()
+                ACTION_NEXT -> next()
+                ACTION_PREVIOUS -> previous()
+                ACTION_TOGGLE_SHUFFLE -> {
+                    player.shuffleModeEnabled = !player.shuffleModeEnabled
+                    updateNotification()
+                }
+                ACTION_TOGGLE_REPEAT -> {
+                    player.repeatMode = if (player.repeatMode == Player.REPEAT_MODE_OFF) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
+                    updateNotification()
+                }
+                ACTION_SEEK_TO -> {
+                    val pos = intent.getLongExtra(EXTRA_POSITION_MS, -1L)
+                    if (pos >= 0) {
+                        player.seekTo(pos)
+                        PlaybackStateHolder.update(positionMs = pos)
+                    }
                 }
             }
+            START_STICKY
+        } catch (e: Exception) {
+            Log.e(TAG, "onStartCommand error", e)
+            START_STICKY
         }
-
-        startForeground(NOTIFICATION_ID, buildNotification())
-        return START_STICKY
     }
 
     override fun onDestroy() {
@@ -238,6 +241,7 @@ class MusicPlayerService : Service() {
     }
 
     companion object {
+        private const val TAG = "MusicPlayerService"
         private const val CHANNEL_ID = "music_playback"
         private const val NOTIFICATION_ID = 1001
 
