@@ -65,6 +65,12 @@ class MusicPlayerService : Service() {
             override fun onPlayerError(error: PlaybackException) {
                 Log.e(TAG, "ExoPlayer error: ${'$'}{error.errorCodeName}", error)
             }
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) {
+                    val dur = runCatching { player.duration }.getOrElse { 0L }
+                    if (dur > 0) PlaybackStateHolder.update(durationMs = dur)
+                }
+            }
         })
         createNotificationChannel()
     }
@@ -125,7 +131,8 @@ class MusicPlayerService : Service() {
         player.setMediaItems(uris.map { MediaItem.fromUri(it) }, startIndex, 0L)
         player.prepare()
         player.playWhenReady = true
-        PlaybackStateHolder.update(durationMs = player.duration)
+        val dur = runCatching { player.duration }.getOrElse { 0L }
+        if (dur > 0) PlaybackStateHolder.update(durationMs = dur)
         updatePlaybackState()
         updateNotification()
     }
@@ -135,7 +142,8 @@ class MusicPlayerService : Service() {
         player.prepare()
         player.playWhenReady = true
         updateMetadata(title, artist, artworkUrl)
-        PlaybackStateHolder.update(title = title, artist = artist, artworkUrl = artworkUrl, durationMs = player.duration)
+        val dur = runCatching { player.duration }.getOrElse { 0L }
+        PlaybackStateHolder.update(title = title, artist = artist, artworkUrl = artworkUrl, durationMs = if (dur > 0) dur else PlaybackStateHolder.uiState.value.durationMs)
         updatePlaybackState()
         updateNotification()
     }
@@ -168,7 +176,8 @@ class MusicPlayerService : Service() {
                 .setState(state, player.currentPosition, 1.0f)
                 .build()
         )
-        PlaybackStateHolder.update(positionMs = player.currentPosition, durationMs = if (player.duration > 0) player.duration else PlaybackStateHolder.uiState.value.durationMs)
+        val dur = runCatching { player.duration }.getOrElse { PlaybackStateHolder.uiState.value.durationMs }
+        PlaybackStateHolder.update(positionMs = player.currentPosition, durationMs = if (dur > 0) dur else PlaybackStateHolder.uiState.value.durationMs)
     }
 
     private fun buildNotification(): Notification {
@@ -232,7 +241,7 @@ class MusicPlayerService : Service() {
 
     private fun startTicker() {
         if (tickerJob?.isActive == true) return
-        tickerJob = CoroutineScope(Dispatchers.Default).launch {
+        tickerJob = CoroutineScope(Dispatchers.Main.immediate).launch {
             while (isActive) {
                 try {
                     val pos = runCatching { player.currentPosition }.getOrElse { 0L }
@@ -243,7 +252,7 @@ class MusicPlayerService : Service() {
                     Log.e(TAG, "ticker error", e)
                     break
                 }
-                delay(500)
+                delay(250)
             }
         }
     }
