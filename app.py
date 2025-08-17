@@ -1084,19 +1084,33 @@ def api_artists():
 
 @app.route('/api/albums')
 def api_albums():
-    """Get list of all albums"""
+    """Get list of all albums (static + JioSaavn-derived)"""
     try:
         static_songs = get_static_songs()
         popular_songs = get_popular_songs(20)
         all_songs = static_songs + popular_songs
-        
+
+        # Try to enrich with JioSaavn albums by doing a light search for a common term
+        try:
+            # Use a generic query to fetch a variety of albums
+            jio_songs, _ = search_jiosaavn("top", page=1, per_page=20)
+            # Ensure HTTPS urls
+            for s in jio_songs:
+                if s.get('url'):
+                    s['url'] = upgrade_url(s['url'])
+                if s.get('thumbnail'):
+                    s['thumbnail'] = upgrade_url(s['thumbnail'])
+            all_songs = all_songs + jio_songs
+        except Exception as e:
+            print(f"Warning: failed to fetch JioSaavn albums seed: {e}")
+
         albums = {}
         for song in all_songs:
             album = song.get('album') or 'Unknown Album'
             if album not in albums:
                 albums[album] = {
                     'name': album,
-                    'artist': song['artist'],
+                    'artist': song.get('artist') or 'Unknown Artist',
                     'year': song.get('year'),
                     'songs': [],
                     'duration': 0
@@ -1104,14 +1118,14 @@ def api_albums():
             albums[album]['songs'].append(song)
             if song.get('duration'):
                 albums[album]['duration'] += song['duration']
-        
+
         # Convert to list and add metadata
         album_list = []
         for album_name, album_data in albums.items():
             album_data['song_count'] = len(album_data['songs'])
             album_data['id'] = f"album-{len(album_list)}"
             album_list.append(album_data)
-        
+
         return jsonify({
             'albums': album_list,
             'total': len(album_list)
