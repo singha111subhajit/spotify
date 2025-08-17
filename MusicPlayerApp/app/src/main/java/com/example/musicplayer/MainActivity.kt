@@ -22,6 +22,8 @@ import com.example.musicplayer.ui.screens.OnlineScreen
 import com.example.musicplayer.ui.screens.OfflineScreen
 import com.example.musicplayer.ui.screens.PlayerScreen
 import com.example.musicplayer.ui.screens.SearchScreen
+import com.example.musicplayer.ui.screens.HomeScreen
+import com.example.musicplayer.ui.screens.AlbumScreen
 import com.example.musicplayer.ui.theme.MusicAppTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.NavigationBar
@@ -57,6 +59,10 @@ fun AppNav() {
                 composable("register") { RegisterScreen(navController) }
                 composable("main") { MainScaffold(rootNavController = navController) }
                 composable("player") { PlayerScreen(navController) }
+                composable("album/{name}") { backStackEntry ->
+                    val name = backStackEntry.arguments?.getString("name") ?: ""
+                    AlbumScreen(navController, name)
+                }
             }
         }
     }
@@ -93,7 +99,7 @@ fun MainScaffold(rootNavController: NavController) {
         }
     ) { padding ->
         NavHost(bottomNavController, startDestination = "home", modifier = Modifier.padding(padding)) {
-            composable("home") { OnlineScreen(rootNavController) }
+            composable("home") { HomeScreen(rootNavController) }
             composable("search") { SearchScreen(rootNavController) }
             composable("library") { OfflineScreen(rootNavController) }
         }
