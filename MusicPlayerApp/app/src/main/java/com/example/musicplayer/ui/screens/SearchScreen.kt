@@ -62,9 +62,14 @@ fun SearchScreen(rootNav: NavController) {
                         supportingContent = { Text(song.artist) },
                         trailingContent = {
                             TextButton(onClick = {
-                                com.example.musicplayer.player.MusicPlayerService.startPlayUrl(context, song.url,
-                                    title = song.title, artist = song.artist, artworkUrl = song.thumbnail)
-                                rootNav.navigate("player")
+                                val url = song.url
+                                if (url.isNotBlank()) {
+                                    runCatching {
+                                        com.example.musicplayer.player.MusicPlayerService.startPlayUrl(context, url,
+                                            title = song.title, artist = song.artist, artworkUrl = song.thumbnail)
+                                        rootNav.navigate("player")
+                                    }
+                                }
                             }) { Text("Play") }
                         }
                     )

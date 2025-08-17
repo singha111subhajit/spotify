@@ -39,11 +39,18 @@ fun HomeScreen(rootNav: NavController) {
     LaunchedEffect(Unit) {
         isLoading = true
         error = null
-        val albumsResult = runCatching { musicApi.getAlbums().albums }
-        val songsResult = runCatching { musicApi.getSongs().songs }
-        albums = albumsResult.getOrDefault(emptyList()).shuffled()
-        featured = songsResult.getOrDefault(emptyList()).take(6)
-        error = albumsResult.exceptionOrNull()?.message ?: error
+        val songs = runCatching { musicApi.getSongs().songs }.getOrDefault(emptyList())
+        var fetchedAlbums = runCatching { musicApi.getAlbums().albums }.getOrDefault(emptyList())
+        if (fetchedAlbums.isEmpty() && songs.isNotEmpty()) {
+            // Fallback: group songs by album name
+            val grouped = songs.groupBy { it.thumbnail to (it.title + it.artist + (it.id ?: "")) }
+            fetchedAlbums = songs.groupBy { it.title + it.artist }.mapIndexed { index, entry ->
+                val first = entry.value.first()
+                Album(id = "album-$index", name = first.album ?: (first.title), artist = first.artist, song_count = entry.value.size, songs = entry.value)
+            }
+        }
+        albums = fetchedAlbums.shuffled()
+        featured = songs.take(6)
         isLoading = false
     }
 

@@ -5,7 +5,8 @@ data class Song(
     val title: String,
     val artist: String,
     val url: String,
-    val thumbnail: String? = null
+    val thumbnail: String? = null,
+    val album: String? = null
 )
 
 data class Playlist(

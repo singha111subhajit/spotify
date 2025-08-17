@@ -137,12 +137,7 @@ class MusicPlayerService : Service() {
         val builder = MediaMetadataCompat.Builder()
             .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title ?: "")
             .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist ?: "")
-        try {
-            if (!artworkUrl.isNullOrBlank()) {
-                val bmp = BitmapFactory.decodeStream(URL(artworkUrl).openStream())
-                builder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, bmp)
-            }
-        } catch (_: Exception) {}
+        // Avoid network on main thread; rely on notification/clients to show artwork
         mediaSession.setMetadata(builder.build())
     }
 
