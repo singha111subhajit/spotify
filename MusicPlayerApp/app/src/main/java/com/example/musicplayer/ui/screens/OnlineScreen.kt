@@ -27,12 +27,24 @@ fun OnlineScreen(rootNav: NavController) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    var defaultPlaylistId by remember { mutableStateOf<Int?>(null) }
+    var playlistSongIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+
     suspend fun load() {
         isLoading = true
         error = null
         runCatching { repo.getSongsOnline() }
             .onSuccess { songs = it }
             .onFailure { error = it.message }
+        // Fetch default playlist
+        runCatching { repo.getPlaylistsOnline() }.onSuccess { pls ->
+            val pid = pls.firstOrNull()?.id
+            defaultPlaylistId = pid
+            if (pid != null) {
+                val psongs = runCatching { repo.getPlaylistSongs(pid) }.getOrDefault(emptyList())
+                playlistSongIds = psongs.map { it.song_id }.toSet()
+            }
+        }
         isLoading = false
     }
 
@@ -50,6 +62,10 @@ fun OnlineScreen(rootNav: NavController) {
             }
             LazyColumn(Modifier.fillMaxSize()) {
                 items(songs) { song ->
+                    val inPlaylist = remember(playlistSongIds, song.id, song.title) {
+                        val sid = song.id ?: song.title
+                        playlistSongIds.contains(sid)
+                    }
                     ListItem(
                         leadingContent = {
                             AsyncImage(model = song.thumbnail, contentDescription = song.title, modifier = Modifier.size(56.dp))
@@ -63,6 +79,32 @@ fun OnlineScreen(rootNav: NavController) {
                                         title = song.title, artist = song.artist, artworkUrl = song.thumbnail)
                                     rootNav.navigate("player")
                                 }) { Text("Play") }
+                                val pid = defaultPlaylistId
+                                if (pid != null) {
+                                    if (inPlaylist) {
+                                        OutlinedButton(onClick = {
+                                            scope.launch {
+                                                // Find song by id in playlist and remove
+                                                val psongs = repo.getPlaylistSongs(pid)
+                                                val toRemove = psongs.find { it.song_id == (song.id ?: song.title) }
+                                                if (toRemove != null) {
+                                                    repo.removeSongFromPlaylist(pid, toRemove.id)
+                                                    playlistSongIds = playlistSongIds - toRemove.song_id
+                                                    snackbarHostState.showSnackbar("Removed from playlist")
+                                                }
+                                            }
+                                        }) { Text("Remove") }
+                                    } else {
+                                        OutlinedButton(onClick = {
+                                            scope.launch {
+                                                val sid = song.id ?: song.title
+                                                repo.addSongToPlaylist(pid, sid, song.title)
+                                                playlistSongIds = playlistSongIds + sid
+                                                snackbarHostState.showSnackbar("Added to playlist")
+                                            }
+                                        }) { Text("Add") }
+                                    }
+                                }
                                 OutlinedButton(onClick = {
                                     scope.launch {
                                         val file = repo.downloadSong(song)

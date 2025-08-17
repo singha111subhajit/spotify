@@ -6,8 +6,7 @@ import android.os.Environment
 import com.example.musicplayer.model.Playlist
 import com.example.musicplayer.model.Song
 import com.example.musicplayer.network.RetrofitProvider
-import com.example.musicplayer.network.api.PlaylistsResponse
-import com.example.musicplayer.network.api.SongsResponse
+import com.example.musicplayer.network.api.AddSongRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -20,6 +19,11 @@ class MusicRepository(private val context: Context) {
 
     suspend fun getSongsOnline(): List<Song> = musicApi.getSongs().songs
     suspend fun getPlaylistsOnline(): List<Playlist> = musicApi.getPlaylists().playlists
+    suspend fun getPlaylistSongs(playlistId: Int) = musicApi.getPlaylistSongs(playlistId).songs
+    suspend fun addSongToPlaylist(playlistId: Int, songId: String, songTitle: String) =
+        musicApi.addSongToPlaylist(playlistId, AddSongRequest(song_id = songId, song_title = songTitle))
+    suspend fun removeSongFromPlaylist(playlistId: Int, songDbId: Int) =
+        musicApi.removeSongFromPlaylist(playlistId, songDbId)
 
     fun getOfflineSongs(): List<File> {
         val dir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC)

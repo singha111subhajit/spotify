@@ -2,7 +2,11 @@ package com.example.musicplayer.network.api
 
 import com.example.musicplayer.model.Playlist
 import com.example.musicplayer.model.Song
+import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 data class SongsResponse(val songs: List<Song>)
@@ -19,12 +23,28 @@ data class AlbumsResponse(val albums: List<Album>)
 data class ArtistsResponse(val artists: List<ArtistMeta>)
 data class ArtistMeta(val name: String, val song_count: Int, val album_count: Int, val albums: List<String>)
 
+data class PlaylistSong(val id: Int, val song_id: String, val song_title: String)
+data class PlaylistSongsResponse(val songs: List<PlaylistSong>)
+data class AddSongRequest(val song_id: String, val song_title: String)
+
 interface MusicApi {
     @GET("api/songs")
     suspend fun getSongs(): SongsResponse
 
     @GET("playlists")
     suspend fun getPlaylists(): PlaylistsResponse
+
+    @GET("playlists/{playlist_id}/songs")
+    suspend fun getPlaylistSongs(@Path("playlist_id") playlistId: Int): PlaylistSongsResponse
+
+    @POST("playlists/{playlist_id}/songs")
+    suspend fun addSongToPlaylist(@Path("playlist_id") playlistId: Int, @Body body: AddSongRequest): Map<String, Any>
+
+    @DELETE("playlists/{playlist_id}/songs/{song_db_id}")
+    suspend fun removeSongFromPlaylist(
+        @Path("playlist_id") playlistId: Int,
+        @Path("song_db_id") songDbId: Int
+    ): Map<String, Any>
 
     @GET("api/search")
     suspend fun search(@Query("q") q: String): SongsResponse
