@@ -10,8 +10,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.musicplayer.R
 import com.example.musicplayer.model.Song
 import com.example.musicplayer.player.MusicPlayerService
 import com.example.musicplayer.repository.MusicRepository
@@ -78,7 +80,7 @@ fun OnlineScreen(rootNav: NavController) {
                     }
                     ListItem(
                         leadingContent = {
-                            AsyncImage(model = song.thumbnail, contentDescription = song.title, modifier = Modifier.size(56.dp))
+                            AsyncImage(model = song.thumbnail, contentDescription = song.title, modifier = Modifier.size(56.dp), placeholder = painterResource(R.drawable.ic_music_note), error = painterResource(R.drawable.ic_music_note))
                         },
                         headlineContent = { Text(song.title) },
                         supportingContent = { Text(song.artist) },

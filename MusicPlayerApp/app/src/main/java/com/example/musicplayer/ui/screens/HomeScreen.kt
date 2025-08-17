@@ -22,6 +22,7 @@ import com.example.musicplayer.network.RetrofitProvider
 import com.example.musicplayer.network.api.Album
 import com.example.musicplayer.network.api.MusicApi
 import com.example.musicplayer.repository.AuthRepository
+import com.example.musicplayer.storage.SettingsStorage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,13 +31,16 @@ fun HomeScreen(rootNav: NavController) {
     val retrofit = remember { RetrofitProvider.getRetrofit(context) }
     val musicApi = remember { retrofit.create(MusicApi::class.java) }
     val authRepo = remember { AuthRepository(context) }
+    val settings = remember { SettingsStorage.getInstance(context) }
 
     var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
-    var featured by remember { mutableStateOf<List<Song>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var expanded by remember { mutableStateOf(false) }
+    val languages = listOf("English", "Hindi", "Bengali", "Punjabi", "Tamil", "Telugu")
+    var selectedLanguage by remember { mutableStateOf(settings.getLanguage()) }
 
-    LaunchedEffect(Unit) {
+    fun load() {
         isLoading = true
         error = null
         val songs = runCatching { musicApi.getSongs().songs }.getOrDefault(emptyList())
@@ -57,19 +61,34 @@ fun HomeScreen(rootNav: NavController) {
             }
         }
         albums = fetchedAlbums.shuffled()
-        featured = songs.take(6)
         isLoading = false
     }
+
+    LaunchedEffect(Unit) { load() }
 
     Scaffold(topBar = {
         TopAppBar(
             title = { Text("Home") },
             navigationIcon = {
-                IconButton(onClick = { /* root screen, do nothing or open drawer */ }) {
+                IconButton(onClick = { /* root */ }) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
             },
             actions = {
+                // Language selector
+                Box { 
+                    TextButton(onClick = { expanded = true }) { Text(selectedLanguage) }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        languages.forEach { lang ->
+                            DropdownMenuItem(text = { Text(lang) }, onClick = {
+                                selectedLanguage = lang
+                                settings.setLanguage(lang)
+                                expanded = false
+                                load()
+                            })
+                        }
+                    }
+                }
                 TextButton(onClick = {
                     authRepo.logout()
                     rootNav.navigate("login") { popUpTo("main") { inclusive = true } }
@@ -89,31 +108,6 @@ fun HomeScreen(rootNav: NavController) {
                     AlbumCard(album = album, onClick = {
                         rootNav.navigate("album/${album.name}")
                     })
-                }
-            }
-
-            if (featured.isNotEmpty()) {
-                Spacer(Modifier.height(12.dp))
-                Text("Featured Songs", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
-                featured.forEach { song ->
-                    ListItem(
-                        leadingContent = {
-                            AsyncImage(
-                                model = song.thumbnail,
-                                contentDescription = song.title,
-                                placeholder = painterResource(R.drawable.ic_music_note),
-                                error = painterResource(R.drawable.ic_music_note)
-                            )
-                        },
-                        headlineContent = { Text(song.title) },
-                        supportingContent = { Text(song.artist) },
-                        trailingContent = { TextButton(onClick = {
-                            com.example.musicplayer.player.MusicPlayerService.startPlayUrl(context, song.url, title = song.title, artist = song.artist, artworkUrl = song.thumbnail)
-                            rootNav.navigate("player")
-                        }) { Text("Play") } }
-                    )
-                    HorizontalDivider()
                 }
             }
         }

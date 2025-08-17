@@ -6,6 +6,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -18,7 +22,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.musicplayer.ui.screens.LoginScreen
 import com.example.musicplayer.ui.screens.RegisterScreen
-import com.example.musicplayer.ui.screens.OnlineScreen
 import com.example.musicplayer.ui.screens.OfflineScreen
 import com.example.musicplayer.ui.screens.PlayerScreen
 import com.example.musicplayer.ui.screens.SearchScreen
@@ -72,9 +75,9 @@ fun AppNav() {
 fun MainScaffold(rootNavController: NavController) {
     val bottomNavController = rememberNavController()
     val items = listOf(
-        BottomItem("home", "Home"),
-        BottomItem("search", "Search"),
-        BottomItem("library", "Library"),
+        BottomItem("home", "Home", Icons.Default.Home),
+        BottomItem("search", "Search", Icons.Default.Search),
+        BottomItem("library", "Library", Icons.Default.LibraryMusic),
     )
     Scaffold(
         bottomBar = {
@@ -91,7 +94,7 @@ fun MainScaffold(rootNavController: NavController) {
                                 restoreState = true
                             }
                         },
-                        icon = { Icon(painterResource(id = android.R.drawable.ic_media_play), contentDescription = item.label) },
+                        icon = { Icon(item.icon, contentDescription = item.label) },
                         label = { Text(item.label) }
                     )
                 }
@@ -106,4 +109,4 @@ fun MainScaffold(rootNavController: NavController) {
     }
 }
 
-data class BottomItem(val route: String, val label: String)
+data class BottomItem(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)

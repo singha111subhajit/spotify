@@ -7,15 +7,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.musicplayer.R
 import com.example.musicplayer.model.Song
 import com.example.musicplayer.network.RetrofitProvider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +61,14 @@ fun SearchScreen(rootNav: NavController) {
             LazyColumn(Modifier.fillMaxSize()) {
                 items(results) { song ->
                     ListItem(
+                        leadingContent = {
+                            AsyncImage(
+                                model = song.thumbnail,
+                                contentDescription = song.title,
+                                placeholder = painterResource(R.drawable.ic_music_note),
+                                error = painterResource(R.drawable.ic_music_note)
+                            )
+                        },
                         headlineContent = { Text(song.title) },
                         supportingContent = { Text(song.artist) },
                         trailingContent = {
