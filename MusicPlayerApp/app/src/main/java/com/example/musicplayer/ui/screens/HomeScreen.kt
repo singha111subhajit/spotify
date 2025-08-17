@@ -42,11 +42,18 @@ fun HomeScreen(rootNav: NavController) {
         val songs = runCatching { musicApi.getSongs().songs }.getOrDefault(emptyList())
         var fetchedAlbums = runCatching { musicApi.getAlbums().albums }.getOrDefault(emptyList())
         if (fetchedAlbums.isEmpty() && songs.isNotEmpty()) {
-            // Fallback: group songs by album name
-            val grouped = songs.groupBy { it.thumbnail to (it.title + it.artist + (it.id ?: "")) }
-            fetchedAlbums = songs.groupBy { it.title + it.artist }.mapIndexed { index, entry ->
-                val first = entry.value.first()
-                Album(id = "album-$index", name = first.album ?: (first.title), artist = first.artist, song_count = entry.value.size, songs = entry.value)
+            val grouped = songs.groupBy { it.album ?: "Unknown Album" }
+            fetchedAlbums = grouped.entries.mapIndexed { index, entry ->
+                val name = entry.key
+                val groupSongs = entry.value
+                val first = groupSongs.first()
+                Album(
+                    id = "album-$index",
+                    name = name,
+                    artist = first.artist,
+                    song_count = groupSongs.size,
+                    songs = groupSongs
+                )
             }
         }
         albums = fetchedAlbums.shuffled()
