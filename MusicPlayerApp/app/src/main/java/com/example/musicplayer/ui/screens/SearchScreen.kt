@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen(nav: NavController) {
+fun SearchScreen(rootNav: NavController) {
     val context = LocalContext.current
     val retrofit = remember { RetrofitProvider.getRetrofit(context) }
     val musicApi = remember { com.example.musicplayer.network.api.MusicApi::class.java.let { retrofit.create(it) } }
@@ -54,8 +54,9 @@ fun SearchScreen(nav: NavController) {
                         supportingContent = { Text(song.artist) },
                         trailingContent = {
                             TextButton(onClick = {
-                                com.example.musicplayer.player.MusicPlayerService.startPlayUrl(context, song.url)
-                                nav.navigate("player")
+                                com.example.musicplayer.player.MusicPlayerService.startPlayUrl(context, song.url,
+                                    title = song.title, artist = song.artist, artworkUrl = song.thumbnail)
+                                rootNav.navigate("player")
                             }) { Text("Play") }
                         }
                     )

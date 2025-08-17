@@ -21,7 +21,7 @@ import com.example.musicplayer.ui.screens.RegisterScreen
 import com.example.musicplayer.ui.screens.OnlineScreen
 import com.example.musicplayer.ui.screens.OfflineScreen
 import com.example.musicplayer.ui.screens.PlayerScreen
-import com.example.musicplayer.ui.screens.PlaylistsScreen
+import com.example.musicplayer.ui.screens.SearchScreen
 import com.example.musicplayer.ui.theme.MusicAppTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.NavigationBar
@@ -29,6 +29,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
+import androidx.navigation.NavController
 
 class MainActivity : ComponentActivity() {
     private val requestPermission = registerForActivityResult(
@@ -52,7 +53,7 @@ fun AppNav() {
             NavHost(navController = navController, startDestination = "login") {
                 composable("login") { LoginScreen(navController) }
                 composable("register") { RegisterScreen(navController) }
-                composable("main") { MainScaffold() }
+                composable("main") { MainScaffold(rootNavController = navController) }
                 composable("player") { PlayerScreen(navController) }
             }
         }
@@ -60,8 +61,8 @@ fun AppNav() {
 }
 
 @Composable
-fun MainScaffold() {
-    val navController = rememberNavController()
+fun MainScaffold(rootNavController: NavController) {
+    val bottomNavController = rememberNavController()
     val items = listOf(
         BottomItem("home", "Home"),
         BottomItem("search", "Search"),
@@ -70,14 +71,14 @@ fun MainScaffold() {
     Scaffold(
         bottomBar = {
             NavigationBar {
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val navBackStackEntry by bottomNavController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
                 items.forEach { item ->
                     NavigationBarItem(
                         selected = currentDestination?.route == item.route,
                         onClick = {
-                            navController.navigate(item.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            bottomNavController.navigate(item.route) {
+                                popUpTo(bottomNavController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
                             }
@@ -89,10 +90,10 @@ fun MainScaffold() {
             }
         }
     ) { padding ->
-        NavHost(navController, startDestination = "home") {
-            composable("home") { OnlineScreen(navController) }
-            composable("search") { com.example.musicplayer.ui.screens.SearchScreen(navController) }
-            composable("library") { OfflineScreen(navController) }
+        NavHost(bottomNavController, startDestination = "home") {
+            composable("home") { OnlineScreen(rootNavController) }
+            composable("search") { SearchScreen(rootNavController) }
+            composable("library") { OfflineScreen(rootNavController) }
         }
     }
 }

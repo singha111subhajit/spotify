@@ -14,9 +14,8 @@ import com.example.musicplayer.player.MusicPlayerService
 import com.example.musicplayer.repository.MusicRepository
 import java.io.File
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OfflineScreen(nav: NavController) {
+fun OfflineScreen(rootNav: NavController) {
     val context = LocalContext.current
     val repo = remember { MusicRepository(context) }
     var files by remember { mutableStateOf<List<File>>(emptyList()) }
@@ -32,7 +31,7 @@ fun OfflineScreen(nav: NavController) {
                             .fillMaxWidth()
                             .clickable {
                                 MusicPlayerService.startPlayFile(context, file.absolutePath)
-                                nav.navigate("player")
+                                rootNav.navigate("player")
                             }
                             .padding(16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -40,7 +39,7 @@ fun OfflineScreen(nav: NavController) {
                         Text(file.name, style = MaterialTheme.typography.titleMedium)
                         TextButton(onClick = {
                             MusicPlayerService.startPlayFile(context, file.absolutePath)
-                            nav.navigate("player")
+                            rootNav.navigate("player")
                         }) { Text("Play") }
                     }
                     HorizontalDivider()

@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
@@ -21,8 +22,10 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.AudioAttributes
 import androidx.media3.exoplayer.ExoPlayer
+import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import java.net.URL
 
 class MusicPlayerService : Service() {
     private lateinit var player: ExoPlayer
@@ -56,11 +59,14 @@ class MusicPlayerService : Service() {
         when (intent?.action) {
             ACTION_PLAY_URL -> {
                 val url = intent.getStringExtra(EXTRA_URL)
-                if (!url.isNullOrBlank()) playUri(Uri.parse(url))
+                val title = intent.getStringExtra(EXTRA_TITLE)
+                val artist = intent.getStringExtra(EXTRA_ARTIST)
+                val artwork = intent.getStringExtra(EXTRA_ARTWORK)
+                if (!url.isNullOrBlank()) playUri(Uri.parse(url), title, artist, artwork)
             }
             ACTION_PLAY_FILE -> {
                 val path = intent.getStringExtra(EXTRA_FILE_PATH)
-                if (!path.isNullOrBlank()) playUri(Uri.fromFile(java.io.File(path)))
+                if (!path.isNullOrBlank()) playUri(Uri.fromFile(java.io.File(path)), null, null, null)
             }
             ACTION_TOGGLE_PLAY_PAUSE -> if (player.isPlaying) pause() else play()
             ACTION_NEXT -> next()
@@ -95,12 +101,26 @@ class MusicPlayerService : Service() {
         updateNotification()
     }
 
-    private fun playUri(uri: Uri) {
+    private fun playUri(uri: Uri, title: String?, artist: String?, artworkUrl: String?) {
         player.setMediaItem(MediaItem.fromUri(uri))
         player.prepare()
         player.playWhenReady = true
+        updateMetadata(title, artist, artworkUrl)
         updatePlaybackState()
         updateNotification()
+    }
+
+    private fun updateMetadata(title: String?, artist: String?, artworkUrl: String?) {
+        val builder = MediaMetadataCompat.Builder()
+            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title ?: "")
+            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist ?: "")
+        try {
+            if (!artworkUrl.isNullOrBlank()) {
+                val bmp = BitmapFactory.decodeStream(URL(artworkUrl).openStream())
+                builder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, bmp)
+            }
+        } catch (_: Exception) {}
+        mediaSession.setMetadata(builder.build())
     }
 
     private fun pause() { player.pause(); updatePlaybackState(); updateNotification() }
@@ -197,11 +217,17 @@ class MusicPlayerService : Service() {
 
         const val EXTRA_URL = "extra_url"
         const val EXTRA_FILE_PATH = "extra_file_path"
+        const val EXTRA_TITLE = "extra_title"
+        const val EXTRA_ARTIST = "extra_artist"
+        const val EXTRA_ARTWORK = "extra_artwork"
 
-        fun startPlayUrl(context: Context, url: String) {
+        fun startPlayUrl(context: Context, url: String, title: String? = null, artist: String? = null, artworkUrl: String? = null) {
             val intent = Intent(context, MusicPlayerService::class.java).apply {
                 action = ACTION_PLAY_URL
                 putExtra(EXTRA_URL, url)
+                putExtra(EXTRA_TITLE, title)
+                putExtra(EXTRA_ARTIST, artist)
+                putExtra(EXTRA_ARTWORK, artworkUrl)
             }
             ContextCompat.startForegroundService(context, intent)
         }
