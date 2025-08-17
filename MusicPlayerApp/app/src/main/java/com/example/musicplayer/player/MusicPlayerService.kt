@@ -234,7 +234,15 @@ class MusicPlayerService : Service() {
         if (tickerJob?.isActive == true) return
         tickerJob = CoroutineScope(Dispatchers.Default).launch {
             while (isActive) {
-                PlaybackStateHolder.update(positionMs = player.currentPosition, durationMs = if (player.duration > 0) player.duration else PlaybackStateHolder.uiState.value.durationMs)
+                try {
+                    val pos = runCatching { player.currentPosition }.getOrElse { 0L }
+                    val dur = runCatching { player.duration }.getOrElse { PlaybackStateHolder.uiState.value.durationMs }
+                    val safeDur = if (dur > 0) dur else PlaybackStateHolder.uiState.value.durationMs
+                    PlaybackStateHolder.update(positionMs = pos.coerceAtLeast(0L), durationMs = safeDur)
+                } catch (e: Exception) {
+                    Log.e(TAG, "ticker error", e)
+                    break
+                }
                 delay(500)
             }
         }
