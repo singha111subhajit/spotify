@@ -14,6 +14,7 @@ import com.example.musicplayer.player.MusicPlayerService
 import com.example.musicplayer.repository.MusicRepository
 import java.io.File
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OfflineScreen(rootNav: NavController) {
     val context = LocalContext.current
