@@ -136,6 +136,7 @@ class MusicPlayerService : Service() {
         updateNotification()
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun updateMetadata(title: String?, artist: String?, artworkUrl: String?) {
         val builder = MediaMetadataCompat.Builder()
             .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title ?: "")
