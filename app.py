@@ -1195,10 +1195,9 @@ def fetch_album_songs(album_id: str):
         print(f"Error fetching album {album_id}: {e}")
         return None
 
-
 @app.route('/api/albums')
 def api_albums():
-    """Get list of albums (from JioSaavn only, based on frontend-provided queries)"""
+    """Get list of albums with all their songs (from JioSaavn)."""
     try:
         # --- read queries from frontend ---
         queries_param = request.args.get("queries", "Hindi")
@@ -1222,7 +1221,6 @@ def api_albums():
         albums = {}
         for song in all_songs:
             album_name = song.get('album') or "Unknown Album"
-
             if album_name not in albums:
                 albums[album_name] = {
                     'id': f"album-{len(albums)}",
@@ -1233,10 +1231,25 @@ def api_albums():
                     'songs': [],
                     'duration': 0
                 }
-
             albums[album_name]['songs'].append(song)
             if song.get('duration'):
                 albums[album_name]['duration'] += int(song['duration'])
+
+        # --- fetch all songs for each album by name ---
+        for album_name, album in albums.items():
+            try:
+                # search specifically for this album to get all its songs
+                album_songs, _ = search_jiosaavn(album_name, page=1, per_page=50)
+                for s in album_songs:
+                    if s.get('url'):
+                        s['url'] = upgrade_url(s['url'])
+                    if s.get('thumbnail'):
+                        s['thumbnail'] = upgrade_url(s['thumbnail'])
+                # replace current songs with the full list
+                album['songs'] = album_songs
+                album['duration'] = sum(int(s.get('duration', 0)) for s in album_songs)
+            except Exception as e:
+                print(f"Warning: failed to fetch all songs for album {album_name}: {e}")
 
         # --- finalize ---
         album_list = []
@@ -1251,6 +1264,7 @@ def api_albums():
     except Exception as e:
         print(f"Error getting albums: {e}")
         return jsonify({'error': 'Failed to get albums'}), 500
+
 
 
 
