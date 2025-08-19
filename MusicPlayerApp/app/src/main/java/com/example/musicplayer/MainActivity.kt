@@ -1,4 +1,4 @@
-package com.example.musicplayer
+package com.example.DhoonHub
 
 import android.Manifest
 import android.os.Build
@@ -20,14 +20,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.musicplayer.ui.screens.LoginScreen
-import com.example.musicplayer.ui.screens.RegisterScreen
-import com.example.musicplayer.ui.screens.LibraryScreen
-import com.example.musicplayer.ui.screens.PlayerScreen
-import com.example.musicplayer.ui.screens.SearchScreen
-import com.example.musicplayer.ui.screens.HomeScreen
-import com.example.musicplayer.ui.screens.AlbumScreen
-import com.example.musicplayer.ui.theme.MusicAppTheme
+import com.example.DhoonHub.ui.screens.LoginScreen
+import com.example.DhoonHub.ui.screens.RegisterScreen
+import com.example.DhoonHub.ui.screens.LibraryScreen
+import com.example.DhoonHub.ui.screens.PlayerScreen
+import com.example.DhoonHub.ui.screens.SearchScreen
+import com.example.DhoonHub.ui.screens.HomeScreen
+import com.example.DhoonHub.ui.screens.AlbumScreen
+import com.example.DhoonHub.ui.theme.MusicAppTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem

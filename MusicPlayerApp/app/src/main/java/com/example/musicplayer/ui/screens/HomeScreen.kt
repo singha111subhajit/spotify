@@ -1,4 +1,4 @@
-package com.example.musicplayer.ui.screens
+package com.example.DhoonHub.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,12 +16,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.example.musicplayer.R
-import com.example.musicplayer.network.RetrofitProvider
-import com.example.musicplayer.network.api.Album
-import com.example.musicplayer.network.api.MusicApi
-import com.example.musicplayer.repository.AuthRepository
-import com.example.musicplayer.storage.SettingsStorage
+import com.example.DhoonHub.R
+import com.example.DhoonHub.network.RetrofitProvider
+import com.example.DhoonHub.network.api.Album
+import com.example.DhoonHub.network.api.MusicApi
+import com.example.DhoonHub.repository.AuthRepository
+import com.example.DhoonHub.storage.SettingsStorage
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)

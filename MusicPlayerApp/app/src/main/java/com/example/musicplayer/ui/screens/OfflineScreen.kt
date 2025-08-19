@@ -1,4 +1,4 @@
-package com.example.musicplayer.ui.screens
+package com.example.DhoonHub.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,8 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.musicplayer.player.MusicPlayerService
-import com.example.musicplayer.repository.MusicRepository
+import com.example.DhoonHub.player.DhoonHubService
+import com.example.DhoonHub.repository.MusicRepository
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,7 +31,7 @@ fun OfflineScreen(rootNav: NavController) {
                         Modifier
                             .fillMaxWidth()
                             .clickable {
-                                MusicPlayerService.startPlayFile(context, file.absolutePath)
+                                DhoonHubService.startPlayFile(context, file.absolutePath)
                                 rootNav.navigate("player")
                             }
                             .padding(16.dp),
@@ -39,7 +39,7 @@ fun OfflineScreen(rootNav: NavController) {
                     ) {
                         Text(file.name, style = MaterialTheme.typography.titleMedium)
                         TextButton(onClick = {
-                            MusicPlayerService.startPlayFile(context, file.absolutePath)
+                            DhoonHubService.startPlayFile(context, file.absolutePath)
                             rootNav.navigate("player")
                         }) { Text("Play") }
                     }

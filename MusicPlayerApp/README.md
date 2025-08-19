@@ -1,4 +1,4 @@
-# MusicPlayerApp (Kotlin + Compose + ExoPlayer)
+# DhoonHubApp (Kotlin + Compose + ExoPlayer)
 
 This is a sample Android music player app scaffold that integrates with a Flask/Django backend via Retrofit/OkHttp, supports JWT auth, online streaming, and offline playback using ExoPlayer. It includes lock screen and notification controls.
 
@@ -11,7 +11,7 @@ This is a sample Android music player app scaffold that integrates with a Flask/
 
 ## Quick start
 1. Open this folder in Android Studio (Giraffe+)
-2. Set your backend base URL in `app/src/main/java/com/example/musicplayer/config/ApiConfig.kt`
+2. Set your backend base URL in `app/src/main/java/com/example/DhoonHub/config/ApiConfig.kt`
 3. Adjust API paths in `network/api` interfaces to match your Flask/Django endpoints
 4. Run the app on a device/emulator with internet access
 

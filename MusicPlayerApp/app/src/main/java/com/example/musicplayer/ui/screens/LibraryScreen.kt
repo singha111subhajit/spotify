@@ -1,4 +1,4 @@
-package com.example.musicplayer.ui.screens
+package com.example.DhoonHub.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,10 +21,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.musicplayer.model.Song
-import com.example.musicplayer.player.MusicPlayerService
-import com.example.musicplayer.repository.MusicRepository
-import com.example.musicplayer.storage.TokenStorage
+import coil.compose.AsyncImage
+import androidx.compose.ui.res.painterResource
+import com.example.DhoonHub.R
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
+import androidx.compose.ui.unit.Dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.example.DhoonHub.model.Song
+import com.example.DhoonHub.player.DhoonHubService
+import com.example.DhoonHub.repository.MusicRepository
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,7 +41,6 @@ import kotlinx.coroutines.launch
 fun LibraryScreen(rootNav: NavController) {
     val context = LocalContext.current
     val repo = remember { MusicRepository(context) }
-    val tokenStorage = remember { TokenStorage.getInstance(context) }
     val coroutineScope = rememberCoroutineScope()
     
     var currentTab by remember { mutableStateOf(0) }
@@ -41,6 +49,11 @@ fun LibraryScreen(rootNav: NavController) {
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var downloadingSongs by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var onlineSearchQuery by remember { mutableStateOf("") }
+    var isSearching by remember { mutableStateOf(false) }
+    var isLoadingMore by remember { mutableStateOf(false) }
+    var currentPage by remember { mutableStateOf(1) }
+    var canLoadMore by remember { mutableStateOf(true) }
 
     // Function to refresh offline songs
     fun refreshOfflineSongs() {
@@ -67,17 +80,38 @@ fun LibraryScreen(rootNav: NavController) {
         refreshOfflineSongs()
     }
 
-    // Load online songs when online tab is selected
-    LaunchedEffect(currentTab) {
-        if (currentTab == 1 && onlineSongs.isEmpty()) {
-            isLoading = true
+    // Load online content when Online tab is selected and when query changes
+    LaunchedEffect(currentTab, onlineSearchQuery) {
+        if (currentTab == 1) {
             error = null
-            try {
-                onlineSongs = repo.getSongsOnline()
-            } catch (e: Exception) {
-                error = "Failed to load online songs: ${e.message}"
-            } finally {
-                isLoading = false
+            // If no query, show a default JioSaavn-driven list using a default query
+            if (onlineSearchQuery.isBlank()) {
+                // Kickstart with a default query to fetch JioSaavn songs
+                isLoading = onlineSongs.isEmpty()
+                isSearching = true
+                try {
+                    currentPage = 1
+                    val first = repo.searchSongsOnline("top", page = currentPage, perPage = 20)
+                    onlineSongs = first
+                    canLoadMore = first.isNotEmpty()
+                } catch (e: Exception) {
+                    error = "Failed to load online songs: ${e.message}"
+                } finally {
+                    isLoading = false
+                    isSearching = false
+                }
+            } else {
+                isSearching = true
+                try {
+                    currentPage = 1
+                    val first = repo.searchSongsOnline(onlineSearchQuery, page = currentPage, perPage = 20)
+                    onlineSongs = first
+                    canLoadMore = first.isNotEmpty()
+                } catch (e: Exception) {
+                    error = "Search failed: ${e.message}"
+                } finally {
+                    isSearching = false
+                }
             }
         }
     }
@@ -115,10 +149,9 @@ fun LibraryScreen(rootNav: NavController) {
                 0 -> OfflineTab(
                     songs = offlineSongs,
                     onSongClick = { song ->
-                        MusicPlayerService.startPlayFile(context, song.url)
+                        DhoonHubService.startPlayFile(context, song.url)
                         rootNav.navigate("player")
                     },
-                    onRefresh = { refreshOfflineSongs() },
                     onDeleteSong = { song ->
                         // Find the corresponding file and delete it
                         val offlineFiles = repo.getOfflineSongs()
@@ -133,35 +166,59 @@ fun LibraryScreen(rootNav: NavController) {
                         refreshOfflineSongs()
                     }
                 )
-                1 ->                 OnlineTab(
+                1 -> OnlineTab(
                     songs = onlineSongs,
                     isLoading = isLoading,
                     error = error,
+                    searchQuery = onlineSearchQuery,
+                    isSearching = isSearching,
+                    onSearchQueryChange = { q -> onlineSearchQuery = q },
                     onSongClick = { song ->
-                        // For online songs, we need to download first
-                        coroutineScope.launch {
-                            val downloadedFile = repo.downloadSong(song)
-                            downloadedFile?.let {
-                                MusicPlayerService.startPlayFile(context, it.absolutePath)
-                                rootNav.navigate("player")
-                            }
-                        }
+                        // Stream directly without auto-download
+                        DhoonHubService.startPlayUrl(
+                            context,
+                            url = song.url,
+                            title = song.title,
+                            artist = song.artist,
+                            artworkUrl = song.thumbnail
+                        )
+                        rootNav.navigate("player")
                     },
                     onDownloadClick = { song ->
                         coroutineScope.launch {
-                            downloadingSongs = downloadingSongs + song.id.orEmpty()
+                            downloadingSongs = downloadingSongs + song.url
                             try {
                                 repo.downloadSong(song)
                                 // Refresh offline songs list
                                 refreshOfflineSongs()
                             } finally {
-                                downloadingSongs = downloadingSongs - song.id.orEmpty()
+                                downloadingSongs = downloadingSongs - song.url
                             }
                         }
                     },
                     isSongDownloaded = { song -> repo.isSongDownloaded(song) },
                     downloadingSongs = downloadingSongs,
-                    onRefreshOffline = { refreshOfflineSongs() }
+                    canLoadMore = canLoadMore,
+                    isLoadingMore = isLoadingMore,
+                    onLoadMore = {
+                        if (canLoadMore && !isSearching) {
+                            coroutineScope.launch {
+                                isLoadingMore = true
+                                currentPage += 1
+                                val next = if (onlineSearchQuery.isBlank()) {
+                                    repo.searchSongsOnline("top", page = currentPage, perPage = 20)
+                                } else {
+                                    repo.searchSongsOnline(onlineSearchQuery, page = currentPage, perPage = 20)
+                                }
+                                if (next.isEmpty()) {
+                                    canLoadMore = false
+                                } else {
+                                    onlineSongs = onlineSongs + next
+                                }
+                                isLoadingMore = false
+                            }
+                        }
+                    }
                 )
             }
         }
@@ -169,8 +226,8 @@ fun LibraryScreen(rootNav: NavController) {
 }
 
 @Composable
-fun OfflineTab(songs: List<Song>, onSongClick: (Song) -> Unit, onRefresh: () -> Unit, onDeleteSong: (Song) -> Unit) {
-    // Pull-to-refresh removed; call onRefresh via a button if needed
+fun OfflineTab(songs: List<Song>, onSongClick: (Song) -> Unit, onDeleteSong: (Song) -> Unit) {
+    // Pull-to-refresh removed
     
     var searchQuery by remember { mutableStateOf("") }
     val filteredSongs = if (searchQuery.isEmpty()) {
@@ -303,22 +360,18 @@ fun OnlineTab(
     songs: List<Song>,
     isLoading: Boolean,
     error: String?,
+    searchQuery: String,
+    isSearching: Boolean,
+    onSearchQueryChange: (String) -> Unit,
     onSongClick: (Song) -> Unit,
     onDownloadClick: (Song) -> Unit,
     isSongDownloaded: (Song) -> Boolean,
     downloadingSongs: Set<String>,
-    onRefreshOffline: () -> Unit
+    canLoadMore: Boolean,
+    isLoadingMore: Boolean,
+    onLoadMore: () -> Unit
 ) {
-    var searchQuery by remember { mutableStateOf("") }
-    val filteredSongs = if (searchQuery.isEmpty()) {
-        songs
-    } else {
-        songs.filter { song ->
-            song.title.contains(searchQuery, ignoreCase = true) ||
-            song.artist.contains(searchQuery, ignoreCase = true) ||
-            (song.album?.contains(searchQuery, ignoreCase = true) == true)
-        }
-    }
+    val filteredSongs = songs
     
     if (isLoading) {
         Box(
@@ -343,11 +396,13 @@ fun OnlineTab(
             Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                "No songs available",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "Search for songs to get results from JioSaavn",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     } else {
         Column(
@@ -360,17 +415,18 @@ fun OnlineTab(
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Styled search with better contrast and shape
                 OutlinedTextField(
                     value = searchQuery,
-                    onValueChange = { searchQuery = it },
+                    onValueChange = { onSearchQueryChange(it) },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("Search online songs...") },
+                    placeholder = { Text("Search songs, artists, albums…") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
                     singleLine = true
                 )
                 
                 if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
+                    IconButton(onClick = { onSearchQueryChange("") }) {
                         Icon(
                             Icons.Default.Clear,
                             contentDescription = "Clear search"
@@ -379,12 +435,14 @@ fun OnlineTab(
                 }
                 
                 // Song count indicator
-                Text(
-                    text = "${filteredSongs.size} song${if (filteredSongs.size != 1) "s" else ""}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 8.dp)
-                )
+                if (!isSearching) {
+                    Text(
+                        text = "${filteredSongs.size} song${if (filteredSongs.size != 1) "s" else ""}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
                 
                 // Download all button
                 if (filteredSongs.isNotEmpty()) {
@@ -404,15 +462,15 @@ fun OnlineTab(
                 }
                 
                 // Download progress indicator
-                if (downloadingSongs.isNotEmpty()) {
+                if (isLoadingMore) {
                     LinearProgressIndicator(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp),
-                        progress = 0.5f // This could be enhanced with actual progress tracking
+                        progress = { 0.5f }
                     )
                     Text(
-                        text = "Downloading ${downloadingSongs.size} song${if (downloadingSongs.size != 1) "s" else ""}...",
+                        text = "Loading more…",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(horizontal = 16.dp)
@@ -420,7 +478,49 @@ fun OnlineTab(
                 }
             }
             
-            if (filteredSongs.isEmpty() && searchQuery.isNotEmpty()) {
+            // Suggestions dropdown like previous search: show close matches beneath search
+            if (searchQuery.isNotBlank() && filteredSongs.isNotEmpty()) {
+                Card(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                ) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 280.dp)
+                            .padding(vertical = 4.dp)
+                    ) {
+                        items(filteredSongs.take(6)) { s ->
+                            ListItem(
+                                leadingContent = {
+                                    AsyncImage(
+                                        model = s.thumbnail,
+                                        contentDescription = s.title,
+                                        modifier = Modifier.size(40.dp),
+                                        placeholder = painterResource(R.drawable.ic_music_note),
+                                        error = painterResource(R.drawable.ic_music_note)
+                                    )
+                                },
+                                headlineContent = { Text(s.title, maxLines = 1) },
+                                supportingContent = { Text(s.artist, maxLines = 1) },
+                                trailingContent = {
+                                    TextButton(onClick = { onSongClick(s) }) { Text("Play") }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+            if (isSearching) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (filteredSongs.isEmpty() && searchQuery.isNotEmpty()) {
                 Box(
                     Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -457,6 +557,17 @@ fun OnlineTab(
                             isDownloading = downloadingSongs.contains(song.id.orEmpty())
                         )
                     }
+                    // Infinite scroll trigger
+                    item(key = "load-more") {
+                        if (filteredSongs.isNotEmpty() && canLoadMore && !isSearching) {
+                            LaunchedEffect(filteredSongs.size, searchQuery) {
+                                onLoadMore()
+                            }
+                            Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -477,20 +588,26 @@ fun OfflineSongItem(song: Song, onClick: () -> Unit, onDelete: () -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = song.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = song.artist,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                EmbeddedArtImage(filePath = song.url, size = 56.dp)
+                val meta by rememberOfflineMetadata(song.url)
+                Column(
+                    Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = meta.title?.takeIf { it.isNotBlank() } ?: song.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = meta.artist?.takeIf { it.isNotBlank() } ?: song.artist,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
             }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -515,6 +632,60 @@ fun OfflineSongItem(song: Song, onClick: () -> Unit, onDelete: () -> Unit) {
 }
 
 @Composable
+private fun EmbeddedArtImage(filePath: String, size: Dp) {
+    val context = LocalContext.current
+    val bitmapState = produceState<android.graphics.Bitmap?>(initialValue = null, filePath) {
+        value = withContext(Dispatchers.IO) {
+            try {
+                val mmr = MediaMetadataRetriever()
+                mmr.setDataSource(filePath)
+                val art = mmr.embeddedPicture
+                mmr.release()
+                if (art != null) BitmapFactory.decodeByteArray(art, 0, art.size) else null
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+    if (bitmapState.value != null) {
+        Image(
+            bitmap = bitmapState.value!!.asImageBitmap(),
+            contentDescription = null,
+            modifier = Modifier.size(size)
+        )
+    } else {
+        Icon(
+            painter = painterResource(R.drawable.ic_music_note),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(size)
+        )
+    }
+}
+
+data class OfflineMeta(val title: String?, val artist: String?, val album: String?)
+
+@Composable
+private fun rememberOfflineMetadata(filePath: String): State<OfflineMeta> {
+    return produceState(initialValue = OfflineMeta(null, null, null), filePath) {
+        val meta = withContext(Dispatchers.IO) {
+            try {
+                val mmr = MediaMetadataRetriever()
+                mmr.setDataSource(filePath)
+                val title = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                val artist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                val album = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                mmr.release()
+                OfflineMeta(title, artist, album)
+            } catch (e: Exception) {
+                OfflineMeta(null, null, null)
+            }
+        }
+        value = meta
+    }
+}
+
+@Composable
 fun OnlineSongItem(
     song: Song,
     onPlayClick: () -> Unit,
@@ -532,41 +703,49 @@ fun OnlineSongItem(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = song.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AsyncImage(
+                    model = song.thumbnail,
+                    contentDescription = song.title,
+                    modifier = Modifier.size(56.dp),
+                    placeholder = painterResource(R.drawable.ic_music_note),
+                    error = painterResource(R.drawable.ic_music_note)
                 )
-                Text(
-                    text = song.artist,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                song.album?.let { album ->
+                Column(
+                    Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     Text(
-                        text = album,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = song.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1
                     )
+                    Text(
+                        text = song.artist,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                    song.album?.let { album ->
+                        Text(
+                            text = album,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                IconButton(
-                    onClick = onDownloadClick,
-                    enabled = !isDownloaded && !isDownloading
-                ) {
-                    if (isDownloading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
+                Box(contentAlignment = Alignment.Center) {
+                    CircularProgressAnimated(isVisible = isDownloading)
+                    IconButton(
+                        onClick = onDownloadClick,
+                        enabled = !isDownloaded && !isDownloading
+                    ) {
                         Icon(
                             if (isDownloaded) Icons.Default.Check else Icons.Default.Download,
                             contentDescription = if (isDownloaded) "Already Downloaded" else "Download",
@@ -583,5 +762,15 @@ fun OnlineSongItem(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CircularProgressAnimated(isVisible: Boolean) {
+    if (isVisible) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(28.dp),
+            strokeWidth = 2.dp
+        )
     }
 }

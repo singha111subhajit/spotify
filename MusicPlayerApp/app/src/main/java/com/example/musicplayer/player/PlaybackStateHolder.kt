@@ -1,8 +1,8 @@
-package com.example.musicplayer.player
+package com.example.DhoonHub.player
 
 import android.content.Context
-import com.example.musicplayer.player.MusicPlayerService.Companion.ACTION_SEEK_TO
-import com.example.musicplayer.player.MusicPlayerService.Companion.EXTRA_POSITION_MS
+import com.example.DhoonHub.player.DhoonHubService.Companion.ACTION_SEEK_TO
+import com.example.DhoonHub.player.DhoonHubService.Companion.EXTRA_POSITION_MS
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -12,7 +12,9 @@ data class PlaybackUiState(
     val durationMs: Long = 0L,
     val title: String = "",
     val artist: String = "",
-    val artworkUrl: String? = null
+    val artworkUrl: String? = null,
+    val currentUrl: String? = null,
+    val isLocal: Boolean = false
 )
 
 object PlaybackStateHolder {
@@ -25,7 +27,9 @@ object PlaybackStateHolder {
         durationMs: Long? = null,
         title: String? = null,
         artist: String? = null,
-        artworkUrl: String? = null
+        artworkUrl: String? = null,
+        currentUrl: String? = null,
+        isLocal: Boolean? = null
     ) {
         val cur = _uiState.value
         _uiState.value = cur.copy(
@@ -35,10 +39,12 @@ object PlaybackStateHolder {
             title = title ?: cur.title,
             artist = artist ?: cur.artist,
             artworkUrl = artworkUrl ?: cur.artworkUrl,
+            currentUrl = currentUrl ?: cur.currentUrl,
+            isLocal = isLocal ?: cur.isLocal,
         )
     }
 
     fun seekTo(context: Context, positionMs: Long) {
-        MusicPlayerService.sendSeekTo(context, positionMs)
+        DhoonHubService.sendSeekTo(context, positionMs)
     }
 }

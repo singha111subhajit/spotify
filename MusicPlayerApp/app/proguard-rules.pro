@@ -2,7 +2,7 @@
 -keep class androidx.media3.** { *; }
 
 # Retrofit/Gson model classes
--keep class com.example.musicplayer.model.** { *; }
+-keep class com.example.DhoonHub.model.** { *; }
 -keepattributes Signature
 -keepattributes *Annotation*
 -dontwarn okio.**

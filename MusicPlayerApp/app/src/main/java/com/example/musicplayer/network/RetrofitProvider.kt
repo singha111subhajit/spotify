@@ -1,10 +1,10 @@
-package com.example.musicplayer.network
+package com.example.DhoonHub.network
 
 import android.content.Context
-import com.example.musicplayer.config.ApiConfig
-import com.example.musicplayer.network.api.AuthApi
-import com.example.musicplayer.network.api.MusicApi
-import com.example.musicplayer.storage.TokenStorage
+import com.example.DhoonHub.config.ApiConfig
+import com.example.DhoonHub.network.api.AuthApi
+import com.example.DhoonHub.network.api.MusicApi
+import com.example.DhoonHub.storage.TokenStorage
 import com.google.gson.GsonBuilder
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor

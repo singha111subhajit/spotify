@@ -1,4 +1,4 @@
-package com.example.musicplayer.player
+package com.example.DhoonHub.player
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -15,8 +15,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import androidx.media.session.MediaButtonReceiver
-import com.example.musicplayer.MainActivity
-import com.example.musicplayer.R
+import com.example.DhoonHub.MainActivity
+import com.example.DhoonHub.R
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -33,7 +33,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-class MusicPlayerService : Service() {
+class DhoonHubService : Service() {
     private lateinit var player: ExoPlayer
     private lateinit var mediaSession: MediaSessionCompat
     private var tickerJob: Job? = null
@@ -47,7 +47,7 @@ class MusicPlayerService : Service() {
                 .build()
             setAudioAttributes(audioAttr, true)
         }
-        mediaSession = MediaSessionCompat(this, "MusicPlayerService").apply {
+        mediaSession = MediaSessionCompat(this, "DhoonHubService").apply {
             isActive = true
             setCallback(object : MediaSessionCompat.Callback() {
                 override fun onPlay() { play() }
@@ -143,7 +143,15 @@ class MusicPlayerService : Service() {
         player.playWhenReady = true
         updateMetadata(title, artist, artworkUrl)
         val dur = runCatching { player.duration }.getOrElse { 0L }
-        PlaybackStateHolder.update(title = title, artist = artist, artworkUrl = artworkUrl, durationMs = if (dur > 0) dur else PlaybackStateHolder.uiState.value.durationMs)
+        val isLocal = uri.scheme == "file"
+        PlaybackStateHolder.update(
+            title = title,
+            artist = artist,
+            artworkUrl = artworkUrl,
+            durationMs = if (dur > 0) dur else PlaybackStateHolder.uiState.value.durationMs,
+            currentUrl = uri.toString(),
+            isLocal = isLocal
+        )
         updatePlaybackState()
         updateNotification()
     }
@@ -263,18 +271,18 @@ class MusicPlayerService : Service() {
     }
 
     companion object {
-        private const val TAG = "MusicPlayerService"
+        private const val TAG = "DhoonHubService"
         private const val CHANNEL_ID = "music_playback"
         private const val NOTIFICATION_ID = 1001
 
-        const val ACTION_PLAY_URL = "com.example.musicplayer.action.PLAY_URL"
-        const val ACTION_PLAY_FILE = "com.example.musicplayer.action.PLAY_FILE"
-        const val ACTION_TOGGLE_PLAY_PAUSE = "com.example.musicplayer.action.TOGGLE_PLAY_PAUSE"
-        const val ACTION_NEXT = "com.example.musicplayer.action.NEXT"
-        const val ACTION_PREVIOUS = "com.example.musicplayer.action.PREVIOUS"
-        const val ACTION_TOGGLE_SHUFFLE = "com.example.musicplayer.action.TOGGLE_SHUFFLE"
-        const val ACTION_TOGGLE_REPEAT = "com.example.musicplayer.action.TOGGLE_REPEAT"
-        const val ACTION_SEEK_TO = "com.example.musicplayer.action.SEEK_TO"
+        const val ACTION_PLAY_URL = "com.example.DhoonHub.action.PLAY_URL"
+        const val ACTION_PLAY_FILE = "com.example.DhoonHub.action.PLAY_FILE"
+        const val ACTION_TOGGLE_PLAY_PAUSE = "com.example.DhoonHub.action.TOGGLE_PLAY_PAUSE"
+        const val ACTION_NEXT = "com.example.DhoonHub.action.NEXT"
+        const val ACTION_PREVIOUS = "com.example.DhoonHub.action.PREVIOUS"
+        const val ACTION_TOGGLE_SHUFFLE = "com.example.DhoonHub.action.TOGGLE_SHUFFLE"
+        const val ACTION_TOGGLE_REPEAT = "com.example.DhoonHub.action.TOGGLE_REPEAT"
+        const val ACTION_SEEK_TO = "com.example.DhoonHub.action.SEEK_TO"
 
         const val EXTRA_URL = "extra_url"
         const val EXTRA_FILE_PATH = "extra_file_path"
@@ -284,7 +292,7 @@ class MusicPlayerService : Service() {
         const val EXTRA_POSITION_MS = "extra_position_ms"
 
         fun startPlayUrl(context: Context, url: String, title: String? = null, artist: String? = null, artworkUrl: String? = null) {
-            val intent = Intent(context, MusicPlayerService::class.java).apply {
+            val intent = Intent(context, DhoonHubService::class.java).apply {
                 action = ACTION_PLAY_URL
                 putExtra(EXTRA_URL, url)
                 putExtra(EXTRA_TITLE, title)
@@ -295,7 +303,7 @@ class MusicPlayerService : Service() {
         }
 
         fun startPlayFile(context: Context, path: String) {
-            val intent = Intent(context, MusicPlayerService::class.java).apply {
+            val intent = Intent(context, DhoonHubService::class.java).apply {
                 action = ACTION_PLAY_FILE
                 putExtra(EXTRA_FILE_PATH, path)
             }
@@ -303,12 +311,12 @@ class MusicPlayerService : Service() {
         }
 
         fun sendControl(context: Context, action: String) {
-            val intent = Intent(context, MusicPlayerService::class.java).apply { this.action = action }
+            val intent = Intent(context, DhoonHubService::class.java).apply { this.action = action }
             ContextCompat.startForegroundService(context, intent)
         }
 
         fun sendSeekTo(context: Context, positionMs: Long) {
-            val intent = Intent(context, MusicPlayerService::class.java).apply {
+            val intent = Intent(context, DhoonHubService::class.java).apply {
                 action = ACTION_SEEK_TO
                 putExtra(EXTRA_POSITION_MS, positionMs)
             }

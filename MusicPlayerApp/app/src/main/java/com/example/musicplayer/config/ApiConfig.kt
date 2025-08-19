@@ -1,4 +1,4 @@
-package com.example.musicplayer.config
+package com.example.DhoonHub.config
 
 object ApiConfig {
     // Set this to your backend base URL, must end with '/'

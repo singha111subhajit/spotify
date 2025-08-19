@@ -1,4 +1,4 @@
-package com.example.musicplayer.model
+package com.example.DhoonHub.model
 
 data class LoginRequest(
     val user_id: String,

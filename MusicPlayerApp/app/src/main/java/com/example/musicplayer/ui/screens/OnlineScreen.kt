@@ -1,4 +1,4 @@
-package com.example.musicplayer.ui.screens
+package com.example.DhoonHub.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,13 +13,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.musicplayer.R
-import com.example.musicplayer.model.Song
-import com.example.musicplayer.player.MusicPlayerService
-import com.example.musicplayer.repository.MusicRepository
+import com.example.DhoonHub.R
+import com.example.DhoonHub.model.Song
+import com.example.DhoonHub.player.DhoonHubService
+import com.example.DhoonHub.repository.MusicRepository
 import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
-import com.example.musicplayer.repository.AuthRepository
+import com.example.DhoonHub.repository.AuthRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,7 +87,7 @@ fun OnlineScreen(rootNav: NavController) {
                         trailingContent = {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 TextButton(onClick = {
-                                    MusicPlayerService.startPlayUrl(context, song.url,
+                                    DhoonHubService.startPlayUrl(context, song.url,
                                         title = song.title, artist = song.artist, artworkUrl = song.thumbnail)
                                     rootNav.navigate("player")
                                 }) { Text("Play") }
@@ -127,7 +127,7 @@ fun OnlineScreen(rootNav: NavController) {
                             }
                         },
                         modifier = Modifier.clickable {
-                            MusicPlayerService.startPlayUrl(context, song.url,
+                            DhoonHubService.startPlayUrl(context, song.url,
                                 title = song.title, artist = song.artist, artworkUrl = song.thumbnail)
                             rootNav.navigate("player")
                         }

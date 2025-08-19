@@ -1,7 +1,7 @@
-package com.example.musicplayer.network.api
+package com.example.DhoonHub.network.api
 
-import com.example.musicplayer.model.Playlist
-import com.example.musicplayer.model.Song
+import com.example.DhoonHub.model.Playlist
+import com.example.DhoonHub.model.Song
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -47,7 +47,11 @@ interface MusicApi {
     ): Map<String, Any>
 
     @GET("api/search")
-    suspend fun search(@Query("q") q: String): SongsResponse
+    suspend fun search(
+        @Query("q") q: String,
+        @Query("page") page: Int? = null,
+        @Query("per_page") perPage: Int? = null
+    ): SongsResponse
 
     @GET("api/albums")
     suspend fun getAlbums(): AlbumsResponse

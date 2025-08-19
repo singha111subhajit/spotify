@@ -1,4 +1,4 @@
-package com.example.musicplayer.ui.screens
+package com.example.DhoonHub.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,8 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.musicplayer.model.Playlist
-import com.example.musicplayer.repository.MusicRepository
+import com.example.DhoonHub.model.Playlist
+import com.example.DhoonHub.repository.MusicRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

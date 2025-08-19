@@ -1,5 +1,5 @@
 // Music Player JavaScript
-class MusicPlayer {
+class DhoonHub {
     constructor() {
         this.songs = [];
         this.currentSongIndex = -1;
@@ -344,14 +344,14 @@ class MusicPlayer {
 // Initialize the music player when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Initializing Music Player...');
-    window.musicPlayer = new MusicPlayer();
+    window.DhoonHub = new DhoonHub();
 });
 
 // Handle page visibility change (pause when tab is hidden)
 document.addEventListener('visibilitychange', () => {
-    if (window.musicPlayer && document.hidden && window.musicPlayer.isPlaying) {
+    if (window.DhoonHub && document.hidden && window.DhoonHub.isPlaying) {
         // Optionally pause when tab is hidden
-        // window.musicPlayer.audio.pause();
+        // window.DhoonHub.audio.pause();
     }
 });
 

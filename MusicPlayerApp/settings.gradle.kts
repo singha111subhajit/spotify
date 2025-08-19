@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MusicPlayerApp"
+rootProject.name = "DhoonHubApp"
 include(":app")

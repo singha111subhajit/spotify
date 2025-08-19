@@ -1,4 +1,4 @@
-package com.example.musicplayer.ui.theme
+package com.example.DhoonHub.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme

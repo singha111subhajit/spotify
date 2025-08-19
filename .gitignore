@@ -40,7 +40,7 @@ Thumbs.db
 node_modules/
 *.log
 
-# Android Studio/Gradle (for MusicPlayerApp)
+# Android Studio/Gradle (for DhoonHubApp)
 /.idea/
 .gradle/
 /local.properties

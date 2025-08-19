@@ -1,11 +1,11 @@
-package com.example.musicplayer.repository
+package com.example.DhoonHub.repository
 
 import android.content.Context
-import com.example.musicplayer.model.AuthResponse
-import com.example.musicplayer.model.LoginRequest
-import com.example.musicplayer.model.RegisterRequest
-import com.example.musicplayer.network.RetrofitProvider
-import com.example.musicplayer.storage.TokenStorage
+import com.example.DhoonHub.model.AuthResponse
+import com.example.DhoonHub.model.LoginRequest
+import com.example.DhoonHub.model.RegisterRequest
+import com.example.DhoonHub.network.RetrofitProvider
+import com.example.DhoonHub.storage.TokenStorage
 
 class AuthRepository(context: Context) {
     private val authApi = RetrofitProvider.getAuthApi(context)

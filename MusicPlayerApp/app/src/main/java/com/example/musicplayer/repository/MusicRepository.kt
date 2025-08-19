@@ -1,12 +1,12 @@
-package com.example.musicplayer.repository
+package com.example.DhoonHub.repository
 
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
-import com.example.musicplayer.model.Playlist
-import com.example.musicplayer.model.Song
-import com.example.musicplayer.network.RetrofitProvider
-import com.example.musicplayer.network.api.AddSongRequest
+import com.example.DhoonHub.model.Playlist
+import com.example.DhoonHub.model.Song
+import com.example.DhoonHub.network.RetrofitProvider
+import com.example.DhoonHub.network.api.AddSongRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -18,6 +18,8 @@ class MusicRepository(private val context: Context) {
     private val musicApi = RetrofitProvider.getMusicApi(context)
 
     suspend fun getSongsOnline(): List<Song> = musicApi.getSongs().songs
+    suspend fun searchSongsOnline(query: String, page: Int = 1, perPage: Int = 20): List<Song> =
+        musicApi.search(q = query, page = page, perPage = perPage).songs
     suspend fun getPlaylistsOnline(): List<Playlist> = musicApi.getPlaylists().playlists
     suspend fun getPlaylistSongs(playlistId: Int) = musicApi.getPlaylistSongs(playlistId).songs
     suspend fun addSongToPlaylist(playlistId: Int, songId: String, songTitle: String) =

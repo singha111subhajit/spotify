@@ -1,4 +1,4 @@
-package com.example.musicplayer.ui.screens
+package com.example.DhoonHub.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,9 +12,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.musicplayer.R
-import com.example.musicplayer.model.Song
-import com.example.musicplayer.network.RetrofitProvider
+import com.example.DhoonHub.R
+import com.example.DhoonHub.model.Song
+import com.example.DhoonHub.network.RetrofitProvider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -25,7 +25,7 @@ import coil.compose.AsyncImage
 fun SearchScreen(rootNav: NavController) {
     val context = LocalContext.current
     val retrofit = remember { RetrofitProvider.getRetrofit(context) }
-    val musicApi = remember { com.example.musicplayer.network.api.MusicApi::class.java.let { retrofit.create(it) } }
+    val musicApi = remember { com.example.DhoonHub.network.api.MusicApi::class.java.let { retrofit.create(it) } }
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<Song>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
@@ -76,7 +76,7 @@ fun SearchScreen(rootNav: NavController) {
                                 val url = song.url
                                 if (url.isNotBlank()) {
                                     runCatching {
-                                        com.example.musicplayer.player.MusicPlayerService.startPlayUrl(context, url,
+                                        com.example.DhoonHub.player.DhoonHubService.startPlayUrl(context, url,
                                             title = song.title, artist = song.artist, artworkUrl = song.thumbnail)
                                         rootNav.navigate("player")
                                     }

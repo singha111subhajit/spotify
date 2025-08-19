@@ -1,4 +1,4 @@
-package com.example.musicplayer.ui.screens
+package com.example.DhoonHub.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,9 +10,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.example.musicplayer.network.RetrofitProvider
-import com.example.musicplayer.network.api.MusicApi
-import com.example.musicplayer.player.MusicPlayerService
+import com.example.DhoonHub.network.RetrofitProvider
+import com.example.DhoonHub.network.api.MusicApi
+import com.example.DhoonHub.player.DhoonHubService
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -20,7 +20,7 @@ fun AlbumScreen(rootNav: NavController, albumName: String) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val retrofit = remember { RetrofitProvider.getRetrofit(context) }
     val musicApi = remember { retrofit.create(MusicApi::class.java) }
-    var songs by remember { mutableStateOf(listOf<com.example.musicplayer.model.Song>()) }
+    var songs by remember { mutableStateOf(listOf<com.example.DhoonHub.model.Song>()) }
     var loading by remember { mutableStateOf(true) }
 
     LaunchedEffect(albumName) {
@@ -46,7 +46,7 @@ fun AlbumScreen(rootNav: NavController, albumName: String) {
                         supportingContent = { Text(song.artist) },
                         trailingContent = {
                             TextButton(onClick = {
-                                MusicPlayerService.startPlayUrl(context, song.url, title = song.title, artist = song.artist, artworkUrl = song.thumbnail)
+                                DhoonHubService.startPlayUrl(context, song.url, title = song.title, artist = song.artist, artworkUrl = song.thumbnail)
                                 rootNav.navigate("player")
                             }) { Text("Play") }
                         }

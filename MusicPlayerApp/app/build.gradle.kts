@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.musicplayer"
+    namespace = "com.example.DhoonHub"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.musicplayer"
+        applicationId = "com.example.DhoonHub"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

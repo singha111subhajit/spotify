@@ -1,8 +1,8 @@
-package com.example.musicplayer.network.api
+package com.example.DhoonHub.network.api
 
-import com.example.musicplayer.model.AuthResponse
-import com.example.musicplayer.model.LoginRequest
-import com.example.musicplayer.model.RegisterRequest
+import com.example.DhoonHub.model.AuthResponse
+import com.example.DhoonHub.model.LoginRequest
+import com.example.DhoonHub.model.RegisterRequest
 import retrofit2.http.Body
 import retrofit2.http.POST
 
