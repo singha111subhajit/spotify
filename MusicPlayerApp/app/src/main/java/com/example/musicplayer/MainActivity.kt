@@ -22,7 +22,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.musicplayer.ui.screens.LoginScreen
 import com.example.musicplayer.ui.screens.RegisterScreen
-import com.example.musicplayer.ui.screens.OfflineScreen
+import com.example.musicplayer.ui.screens.LibraryScreen
 import com.example.musicplayer.ui.screens.PlayerScreen
 import com.example.musicplayer.ui.screens.SearchScreen
 import com.example.musicplayer.ui.screens.HomeScreen
@@ -104,7 +104,7 @@ fun MainScaffold(rootNavController: NavController) {
         NavHost(bottomNavController, startDestination = "home", modifier = Modifier.padding(padding)) {
             composable("home") { HomeScreen(rootNavController) }
             composable("search") { SearchScreen(rootNavController) }
-            composable("library") { OfflineScreen(rootNavController) }
+            composable("library") { LibraryScreen(rootNavController) }
         }
     }
 }

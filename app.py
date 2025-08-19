@@ -29,7 +29,7 @@ JWT_SECRET = 'supersecretkey'
 JWT_ALGO = 'HS256'
 JWT_EXP_DELTA_SECONDS = 7 * 24 * 3600  # 7 days
 
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/music_app')
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql:///music:music@localhost:5432/music_app')
 
 def get_db():
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
