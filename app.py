@@ -1092,23 +1092,123 @@ def api_artists():
         print(f"Error getting artists: {e}")
         return jsonify({'error': 'Failed to get artists'}), 500
 
+import requests
+from flask import request, jsonify
+from urllib.parse import quote
+
+JIO_HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Safari/537.36"}
+
+def _upgrade_audio_url(u: str) -> str:
+    """Try to bump JioSaavn preview links up to 320kbps."""
+    if not u:
+        return u
+    # common variants seen from JioSaavn
+    for low, high in [
+        ("_96_p.mp4", "_320.mp4"),
+        ("_96.mp4",   "_320.mp4"),
+        ("_160.mp4",  "_320.mp4"),
+        ("_48.mp4",   "_320.mp4"),
+        ("_12.mp4",   "_320.mp4"),
+    ]:
+        if low in u:
+            return u.replace(low, high)
+    return u
+
+def _upgrade_image_url(u: str) -> str:
+    """Prefer 500x500 artwork when the CDN path encodes size."""
+    if not u:
+        return u
+    return (
+        u.replace("-50x50.jpg", "-500x500.jpg")
+         .replace("-150x150.jpg", "-500x500.jpg")
+         .replace("/50x50", "/500x500")
+         .replace("/150x150", "/500x500")
+    )
+
+# --- helper: fetch all songs for a given JioSaavn album id ---
+def fetch_album_songs(album_id: str):
+    """
+    Fetch full album details (all tracks) from JioSaavn by album ID.
+    Returns a normalized album dict or None on failure.
+    """
+    try:
+        url = (
+            "https://www.jiosaavn.com/api.php"
+            f"?__call=content.getAlbumDetails&albumid={quote(str(album_id))}&_format=json"
+        )
+        resp = requests.get(url, timeout=10, headers=JIO_HEADERS)
+        resp.raise_for_status()
+        data = resp.json()
+
+        # Some responses return errors or empty bodies
+        if not isinstance(data, dict) or not data.get("title"):
+            return None
+
+        album_title = data.get("title") or "Unknown Album"
+        album_artist = data.get("primary_artists") or data.get("primary_artists_id") or ""
+        album_year = data.get("year")
+        album_image = _upgrade_image_url(data.get("image"))
+
+        songs = []
+        seen_song_ids = set()
+
+        for s in data.get("songs", []):
+            sid = s.get("id") or s.get("songid")
+            if not sid or sid in seen_song_ids:
+                continue
+            seen_song_ids.add(sid)
+
+            duration = 0
+            try:
+                duration = int(s.get("duration") or 0)
+            except Exception:
+                duration = 0
+
+            # JioSaavn often puts preview under media_preview_url
+            audio_url = s.get("media_preview_url") or s.get("media_url") or ""
+            audio_url = _upgrade_audio_url(audio_url)
+
+            songs.append({
+                "id": sid,
+                "title": s.get("title") or s.get("song") or "",
+                "album": album_title,
+                "artist": s.get("singers") or s.get("primary_artists") or "",
+                "year": s.get("year") or album_year,
+                "duration": duration,
+                "url": audio_url,
+                "thumbnail": _upgrade_image_url(s.get("image")),
+                "source": "jiosaavn",
+            })
+
+        return {
+            "id": str(album_id),
+            "name": album_title,
+            "artist": album_artist,
+            "year": album_year,
+            "thumbnail": album_image,
+            "songs": songs,
+            "song_count": len(songs),
+            "duration": sum(song.get("duration") or 0 for song in songs),
+        }
+
+    except Exception as e:
+        print(f"Error fetching album {album_id}: {e}")
+        return None
+
+
 @app.route('/api/albums')
 def api_albums():
     """Get list of albums (from JioSaavn only, based on frontend-provided queries)"""
     try:
-        # Read query param from frontend (comma-separated list)
+        # --- read queries from frontend ---
         queries_param = request.args.get("queries", "Hindi")
-        if queries_param:
-            queries = [q.strip() for q in queries_param.split(",") if q.strip()]
-        else:
-            # fallback if frontend sends nothing
-            queries = ["top"]
+        queries = [q.strip() for q in queries_param.split(",") if q.strip()] or ["top"]
 
         all_songs = []
         for q in queries:
             for page in range(1, 3):  # fetch 2 pages per query
                 try:
-                    jio_songs, _ = search_jiosaavn(q, page=page, per_page=20)
+                    jio_songs, _ = search_jiosaavn(q, page=page, per_page=40)
                     for s in jio_songs:
                         if s.get('url'):
                             s['url'] = upgrade_url(s['url'])
@@ -1118,28 +1218,31 @@ def api_albums():
                 except Exception as e:
                     print(f"Warning: failed to fetch JioSaavn albums for {q} page {page}: {e}")
 
-        # --- group songs by album ---
+        # --- group by album ---
         albums = {}
         for song in all_songs:
-            album = song.get('album') or 'Unknown Album'
-            if album not in albums:
-                albums[album] = {
-                    'name': album,
+            album_name = song.get('album') or "Unknown Album"
+
+            if album_name not in albums:
+                albums[album_name] = {
+                    'id': f"album-{len(albums)}",
+                    'name': album_name,
                     'artist': song.get('artist') or 'Unknown Artist',
                     'year': song.get('year'),
+                    'thumbnail': song.get('thumbnail'),
                     'songs': [],
                     'duration': 0
                 }
-            albums[album]['songs'].append(song)
-            if song.get('duration'):
-                albums[album]['duration'] += song['duration']
 
-        # --- finalize album list ---
+            albums[album_name]['songs'].append(song)
+            if song.get('duration'):
+                albums[album_name]['duration'] += int(song['duration'])
+
+        # --- finalize ---
         album_list = []
-        for album_name, album_data in albums.items():
-            album_data['song_count'] = len(album_data['songs'])
-            album_data['id'] = f"album-{len(album_list)}"
-            album_list.append(album_data)
+        for album in albums.values():
+            album['song_count'] = len(album['songs'])
+            album_list.append(album)
 
         return jsonify({
             'albums': album_list,
@@ -1148,6 +1251,9 @@ def api_albums():
     except Exception as e:
         print(f"Error getting albums: {e}")
         return jsonify({'error': 'Failed to get albums'}), 500
+
+
+
 
 @app.route('/api/stats')
 def api_stats():
