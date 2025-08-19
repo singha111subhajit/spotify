@@ -1094,12 +1094,19 @@ def api_artists():
 
 @app.route('/api/albums')
 def api_albums():
-    """Get list of albums (from JioSaavn only, multiple pages/queries)"""
+    """Get list of albums (from JioSaavn only, based on frontend-provided queries)"""
     try:
+        # Read query param from frontend (comma-separated list)
+        queries_param = request.args.get("queries", "Hindi")
+        if queries_param:
+            queries = [q.strip() for q in queries_param.split(",") if q.strip()]
+        else:
+            # fallback if frontend sends nothing
+            queries = ["top"]
+
         all_songs = []
-        queries = ["top", "hits", "party", "love"]
         for q in queries:
-            for page in range(1, 3):  # 2 pages per query
+            for page in range(1, 3):  # fetch 2 pages per query
                 try:
                     jio_songs, _ = search_jiosaavn(q, page=page, per_page=20)
                     for s in jio_songs:
@@ -1111,7 +1118,7 @@ def api_albums():
                 except Exception as e:
                     print(f"Warning: failed to fetch JioSaavn albums for {q} page {page}: {e}")
 
-        # --- same album aggregation logic as before ---
+        # --- group songs by album ---
         albums = {}
         for song in all_songs:
             album = song.get('album') or 'Unknown Album'
@@ -1127,6 +1134,7 @@ def api_albums():
             if song.get('duration'):
                 albums[album]['duration'] += song['duration']
 
+        # --- finalize album list ---
         album_list = []
         for album_name, album_data in albums.items():
             album_data['song_count'] = len(album_data['songs'])
