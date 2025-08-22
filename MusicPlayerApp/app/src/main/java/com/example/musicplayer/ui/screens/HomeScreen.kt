@@ -32,15 +32,13 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(rootNav: NavController) {
+fun HomeScreen(
+    rootNav: NavController,
+    musicViewModel: MusicViewModel // Receive the shared ViewModel
+) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val authRepo = remember { AuthRepository(context) }
     val settings = remember { SettingsStorage.getInstance(context) }
-    
-    // Use the ViewModel
-    val musicViewModel: MusicViewModel = viewModel(
-        factory = MusicViewModel.Factory(context)
-    )
     
     var expanded by remember { mutableStateOf(false) }
     val languages = listOf("English", "Hindi", "Bengali", "Punjabi", "Tamil", "Telugu")

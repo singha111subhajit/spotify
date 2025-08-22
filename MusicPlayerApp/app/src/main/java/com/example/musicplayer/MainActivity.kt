@@ -28,6 +28,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.DhoonHub.ui.MainScaffold
 import com.example.DhoonHub.player.PlaybackStateHolder
 import com.example.DhoonHub.ui.components.MiniPlayer
 import com.example.DhoonHub.ui.screens.*
@@ -52,6 +53,13 @@ fun AppNav() {
     MusicAppTheme {
         Surface(color = MaterialTheme.colorScheme.background) {
             val navController: NavHostController = rememberNavController()
+            val context = LocalContext.current
+
+            // Create a single MusicViewModel instance to be shared across screens.
+            // This ensures that the cache and state are preserved during navigation.
+            val musicViewModel: com.example.DhoonHub.viewmodel.MusicViewModel = viewModel(
+                factory = com.example.DhoonHub.viewmodel.MusicViewModel.Factory(context)
+            )
             
             // Collect playback state to know if music is playing
             val playbackState by PlaybackStateHolder.uiState.collectAsState()
@@ -59,7 +67,7 @@ fun AppNav() {
             NavHost(navController = navController, startDestination = "login") {
                 composable("login") { LoginScreen(navController) }
                 composable("register") { RegisterScreen(navController) }
-                composable("main") { MainScaffold(rootNavController = navController) }
+                composable("main") { MainScaffold(rootNavController = navController, musicViewModel = musicViewModel) }
                 composable("player") { PlayerScreen(navController) }
                 composable(
                     route = "album/{albumName}",
@@ -67,10 +75,7 @@ fun AppNav() {
                 ) { backStackEntry ->
                     val albumName = backStackEntry.arguments?.getString("albumName")
                     if (albumName != null) {
-                        val context = LocalContext.current
-                        val musicViewModel = viewModel<com.example.DhoonHub.viewmodel.MusicViewModel>(
-                            factory = com.example.DhoonHub.viewmodel.MusicViewModel.Factory(context)
-                        )
+                        // Use the shared ViewModel instance
                         AlbumScreen(rootNav = navController, albumName = albumName, musicViewModel = musicViewModel)
                     } else {
                         // Handle the case where albumName is null, e.g., show an error or navigate back
@@ -78,53 +83,6 @@ fun AppNav() {
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun MainScaffold(rootNavController: NavController) {
-    val bottomNavController = rememberNavController()
-    val items = listOf(
-        BottomItem("home", "Home", Icons.Default.Home),
-        BottomItem("search", "Search", Icons.Default.Search),
-        BottomItem("library", "Library", Icons.Default.LibraryMusic),
-    )
-    
-    val navBackStackEntry by bottomNavController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
-    val isPlayerScreen = currentDestination?.route == "player"
-    
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                items.forEach { item ->
-                    NavigationBarItem(
-                        selected = currentDestination?.route == item.route,
-                        onClick = {
-                            bottomNavController.navigate(item.route) {
-                                popUpTo(bottomNavController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(item.icon, contentDescription = item.label) },
-                        label = { Text(item.label) }
-                    )
-                }
-            }
-        }
-    ) { padding ->
-        // Main content
-        NavHost(bottomNavController, startDestination = "home", modifier = Modifier.padding(padding)) {
-            composable("home") { HomeScreen(rootNavController) }
-            composable("search") { SearchScreen(rootNavController) }
-            composable("library") { LibraryScreen(rootNavController) }
-        }
-        
-        // Add MiniPlayer if not on player screen
-        if (!isPlayerScreen) {
-            MiniPlayer(navController = rootNavController)
         }
     }
 }

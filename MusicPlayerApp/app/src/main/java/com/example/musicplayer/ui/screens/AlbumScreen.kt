@@ -31,23 +31,8 @@ fun AlbumScreen(
 
     LaunchedEffect(albumName) {
         loading = true
-
-        // Try cache first
+        // Let the ViewModel handle the caching and fetching logic
         songs = musicViewModel.getAlbumSongs(albumName)
-
-        if (songs.isEmpty()) {
-            // Fetch from network if not cached
-            val albums: List<Album> = runCatching {
-                musicViewModel.getMusicApi().getAlbums().albums
-            }.getOrDefault(emptyList())
-
-            val album = albums.find { it.name == albumName }
-            songs = album?.songs ?: emptyList()
-
-            if (songs.isNotEmpty()) {
-                musicViewModel.cacheAlbumSongs(albumName, songs)
-            }
-        }
         loading = false
     }
 

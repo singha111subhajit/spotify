@@ -174,20 +174,34 @@ class MusicViewModel(private val context: Context) : ViewModel() {
         }
     }
     
-    fun getAlbumSongs(albumName: String): List<Song> {
-        // Return cached songs if available
-        albumSongsCache[albumName]?.let { return it }
-        
-        // Find album in our albums list
-        val album = albums.find { it.name == albumName }
-        val songs = album?.songs ?: emptyList()
-        
-        // Cache the result
-        if (songs.isNotEmpty()) {
-            albumSongsCache[albumName] = songs
+    suspend fun getAlbumSongs(albumName: String): List<Song> {
+        // 1. Return cached songs if available.
+        albumSongsCache[albumName]?.let { if (it.isNotEmpty()) return it }
+
+        // 2. Check the main 'albums' state, which should be populated by `loadAlbums`.
+        val albumFromState = albums.find { it.name == albumName }
+        if (albumFromState != null && albumFromState.songs.isNotEmpty()) {
+            albumSongsCache[albumName] = albumFromState.songs
+            return albumFromState.songs
         }
-        
-        return songs
+
+        // 3. Fallback: If songs are not in the state (e.g., `loadAlbums` hasn't completed
+        // or returned albums without song lists), fetch albums directly.
+        // This fetch is self-contained and does not modify the main `albums` state,
+        // preventing side effects.
+        return try {
+            val fetchedAlbums = musicApi.getAlbums().albums
+            val targetAlbum = fetchedAlbums.find { it.name == albumName }
+            val songs = targetAlbum?.songs ?: emptyList()
+
+            if (songs.isNotEmpty()) {
+                albumSongsCache[albumName] = songs
+            }
+            songs
+        } catch (e: Exception) {
+            albumsError = "Failed to fetch songs for album '$albumName': ${e.message}"
+            emptyList()
+        }
     }
     
     fun refreshAll() {

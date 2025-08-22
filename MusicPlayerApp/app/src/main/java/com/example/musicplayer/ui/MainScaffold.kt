@@ -24,9 +24,13 @@ import com.example.DhoonHub.ui.screens.HomeScreen
 import com.example.DhoonHub.ui.screens.LibraryScreen
 import com.example.DhoonHub.ui.screens.ProfileScreen
 import com.example.DhoonHub.ui.screens.SearchScreen
+import com.example.DhoonHub.viewmodel.MusicViewModel
 
 @Composable
-fun MainScaffold(rootNavController: NavController) {
+fun MainScaffold(
+    rootNavController: NavController,
+    musicViewModel: MusicViewModel
+) {
     val navController = rememberNavController()
     val screens = listOf(
         Screen.Home,
@@ -70,7 +74,7 @@ fun MainScaffold(rootNavController: NavController) {
                 navController = navController,
                 startDestination = Screen.Home.route
             ) {
-                composable(Screen.Home.route) { HomeScreen(rootNavController) }
+                composable(Screen.Home.route) { HomeScreen(rootNavController, musicViewModel) }
                 composable(Screen.Search.route) { SearchScreen(rootNavController) }
                 composable(Screen.Library.route) { LibraryScreen(rootNavController) }
                 composable(Screen.Profile.route) { ProfileScreen(rootNavController) }
