@@ -1,3 +1,4 @@
+
 package com.example.DhoonHub.ui.screens
 
 import androidx.compose.foundation.background
@@ -35,9 +36,31 @@ fun PlayerScreen(nav: NavController) {
     // Networking & API
     val retrofit = remember { RetrofitProvider.getRetrofit(context) }
     val musicApi = remember { retrofit.create(MusicApi::class.java) }
+    // Create the repository instance at the top level
+    val repo = remember { MusicRepository(context) }
 
     var related by remember { mutableStateOf(listOf<Song>()) }
     val scope = rememberCoroutineScope()
+
+    // Track download state
+    var isDownloaded by remember { mutableStateOf(false) }
+    var downloading by remember { mutableStateOf(false) }
+    
+    // Check download state whenever the current URL changes
+    LaunchedEffect(uiState.currentUrl, uiState.title, uiState.artist) {
+        val url = uiState.currentUrl ?: return@LaunchedEffect
+        if (url.startsWith("http")) {
+            val song = Song(
+                id = url,
+                title = uiState.title,
+                artist = uiState.artist,
+                url = url
+            )
+            isDownloaded = repo.isSongDownloaded(song)
+        } else {
+            isDownloaded = true // Local file is already "downloaded"
+        }
+    }
 
     // Fetch related songs when artist changes
     LaunchedEffect(uiState.artist) {
@@ -147,23 +170,14 @@ fun PlayerScreen(nav: NavController) {
                         }
 
                         // Download button
-                        val repo = remember { MusicRepository(context) }
-                        var downloading by remember { mutableStateOf(false) }
+                        // Remove this line as we already defined repo at the top
+                        // val repo = remember { MusicRepository(context) }
                         val currentUrl = uiState.currentUrl
-                        val isDownloaded = remember(currentUrl, uiState.title, uiState.artist) {
-                            if (currentUrl != null && currentUrl.startsWith("http")) {
-                                Song(
-                                    id = currentUrl,
-                                    title = uiState.title,
-                                    artist = uiState.artist,
-                                    url = currentUrl
-                                ).let { repo.isSongDownloaded(it) }
-                            } else uiState.isLocal
-                        }
-
+                        
                         IconButton(onClick = {
                             val url = currentUrl ?: return@IconButton
                             if (!url.startsWith("http") || isDownloaded || downloading) return@IconButton
+                            
                             downloading = true
                             val song = Song(
                                 id = url,
@@ -172,9 +186,13 @@ fun PlayerScreen(nav: NavController) {
                                 url = url,
                                 thumbnail = uiState.artworkUrl
                             )
+                            
                             scope.launch {
                                 try {
-                                    repo.downloadSong(song)
+                                    val success = repo.downloadSong(song)
+                                    if (success) {
+                                        isDownloaded = true
+                                    }
                                 } finally {
                                     downloading = false
                                 }

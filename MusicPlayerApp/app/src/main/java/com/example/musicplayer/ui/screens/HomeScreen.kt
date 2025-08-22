@@ -26,63 +26,27 @@ import com.example.DhoonHub.ui.components.ErrorScreen
 import com.example.DhoonHub.ui.components.LoadingScreen
 import com.example.DhoonHub.ui.components.ShimmerAlbumCard
 import com.example.DhoonHub.ui.components.EmptyScreen
+import com.example.DhoonHub.viewmodel.MusicViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(rootNav: NavController) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val retrofit = remember { RetrofitProvider.getRetrofit(context) }
-    val musicApi = remember { retrofit.create(MusicApi::class.java) }
     val authRepo = remember { AuthRepository(context) }
     val settings = remember { SettingsStorage.getInstance(context) }
-
-    var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf<String?>(null) }
+    
+    // Use the ViewModel
+    val musicViewModel: MusicViewModel = viewModel(
+        factory = MusicViewModel.Factory(context)
+    )
+    
     var expanded by remember { mutableStateOf(false) }
     val languages = listOf("English", "Hindi", "Bengali", "Punjabi", "Tamil", "Telugu")
     var selectedLanguage by remember { mutableStateOf(settings.getLanguage()) }
 
     val coroutineScope = rememberCoroutineScope()
-
-    suspend fun load() {
-        isLoading = true
-        error = null
-
-        val songs = runCatching { musicApi.getSongs().songs }
-            .getOrElse {
-                error = "Failed to fetch songs"
-                emptyList()
-            }
-
-        var fetchedAlbums = runCatching { musicApi.getAlbums().albums }
-            .getOrElse {
-                error = "Failed to fetch albums"
-                emptyList()
-            }
-
-        if (fetchedAlbums.isEmpty() && songs.isNotEmpty()) {
-            val grouped = songs.groupBy { it.album ?: "Unknown Album" }
-            fetchedAlbums = grouped.entries.mapIndexed { index, entry ->
-                val name = entry.key
-                val groupSongs = entry.value
-                val first = groupSongs.first()
-                Album(
-                    id = "album-$index",
-                    name = name,
-                    artist = first.artist,
-                    song_count = groupSongs.size,
-                    songs = groupSongs
-                )
-            }
-        }
-
-        albums = fetchedAlbums.shuffled()
-        isLoading = false
-    }
-
-    LaunchedEffect(Unit) { load() }
 
     Scaffold(
         topBar = {
@@ -102,7 +66,8 @@ fun HomeScreen(rootNav: NavController) {
                                     selectedLanguage = lang
                                     settings.setLanguage(lang)
                                     expanded = false
-                                    coroutineScope.launch { load() }
+                                    // Force refresh when language changes
+                                    musicViewModel.refreshAll()
                                 })
                             }
                         }
@@ -123,7 +88,7 @@ fun HomeScreen(rootNav: NavController) {
                 .fillMaxSize()
         ) {
             when {
-                isLoading && albums.isEmpty() -> {
+                musicViewModel.isLoadingAlbums && musicViewModel.albums.isEmpty() -> {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -150,16 +115,16 @@ fun HomeScreen(rootNav: NavController) {
                     }
                 }
                 
-                error != null && albums.isEmpty() -> {
+                musicViewModel.albumsError != null && musicViewModel.albums.isEmpty() -> {
                     ErrorScreen(
-                        message = error!!,
+                        message = musicViewModel.albumsError!!,
                         onRetry = {
-                            coroutineScope.launch { load() }
+                            coroutineScope.launch { musicViewModel.refreshAll() }
                         }
                     )
                 }
                 
-                albums.isEmpty() && !isLoading -> {
+                musicViewModel.albums.isEmpty() && !musicViewModel.isLoadingAlbums -> {
                     EmptyScreen(
                         title = "No Music Found",
                         subtitle = "We couldn't find any albums. Try changing the language or check your connection."
@@ -173,7 +138,7 @@ fun HomeScreen(rootNav: NavController) {
                             .padding(16.dp)
                     ) {
                         // Show loading indicator at top if refreshing
-                        if (isLoading && albums.isNotEmpty()) {
+                        if (musicViewModel.isLoadingAlbums && musicViewModel.albums.isNotEmpty()) {
                             LinearProgressIndicator(
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -181,7 +146,7 @@ fun HomeScreen(rootNav: NavController) {
                         }
                         
                         // Show error message if there's an error but we have cached data
-                        if (error != null && albums.isNotEmpty()) {
+                        if (musicViewModel.albumsError != null && musicViewModel.albums.isNotEmpty()) {
                             Card(
                                 colors = CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.errorContainer
@@ -193,14 +158,14 @@ fun HomeScreen(rootNav: NavController) {
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Failed to refresh: $error",
+                                        text = "Failed to refresh: ${musicViewModel.albumsError}",
                                         color = MaterialTheme.colorScheme.onErrorContainer,
                                         style = MaterialTheme.typography.bodySmall,
                                         modifier = Modifier.weight(1f)
                                     )
                                     TextButton(
                                         onClick = {
-                                            coroutineScope.launch { load() }
+                                            coroutineScope.launch { musicViewModel.refreshAll() }
                                         }
                                     ) {
                                         Text("Retry")
@@ -224,7 +189,7 @@ fun HomeScreen(rootNav: NavController) {
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            items(albums) { album ->
+                            items(musicViewModel.albums) { album ->
                                 AlbumCard(album = album, onClick = {
                                     rootNav.navigate("album/${album.name}")
                                 })

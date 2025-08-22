@@ -1,3 +1,4 @@
+
 package com.example.DhoonHub.ui.screens
 
 import androidx.compose.foundation.clickable
@@ -49,30 +50,71 @@ fun LibraryScreen(rootNav: NavController) {
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var downloadingSongs by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var downloadedSongIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var onlineSearchQuery by remember { mutableStateOf("") }
     var isSearching by remember { mutableStateOf(false) }
     var isLoadingMore by remember { mutableStateOf(false) }
     var currentPage by remember { mutableStateOf(1) }
     var canLoadMore by remember { mutableStateOf(true) }
 
-    // Function to refresh offline songs
+    // Function to refresh offline songs and downloaded state
     fun refreshOfflineSongs() {
-        val offlineFiles = repo.getOfflineSongs()
-        offlineSongs = offlineFiles.map { file ->
-            // Parse filename to extract song info
-            val filename = file.nameWithoutExtension
-            val parts = filename.split("-")
-            val artist = if (parts.size > 1) parts[0] else "Unknown Artist"
-            val title = if (parts.size > 2) parts[1] else filename
-            Song(
-                id = file.absolutePath,
-                title = title,
-                artist = artist,
-                url = file.absolutePath,
-                thumbnail = null,
-                album = null
-            )
-        }.sortedBy { it.title.lowercase() }
+        coroutineScope.launch {
+            val offlineFiles = repo.getOfflineSongs()
+            offlineSongs = offlineFiles.map { file ->
+                // Parse filename to extract song info
+                val filename = file.nameWithoutExtension
+                val parts = filename.split("-")
+                val artist = if (parts.size > 1) parts[0] else "Unknown Artist"
+                val title = if (parts.size > 2) parts[1] else filename
+                Song(
+                    id = file.absolutePath,
+                    title = title,
+                    artist = artist,
+                    url = file.absolutePath,
+                    thumbnail = null,
+                    // Add other properties as needed
+                )
+            }
+            
+            // Update the set of downloaded song IDs
+            downloadedSongIds = offlineFiles.map { it.nameWithoutExtension }.toSet()
+        }
+    }
+    
+    // Function to handle song download with proper state updates
+    fun downloadSong(song: Song) {
+        if (downloadingSongs.contains(song.id.orEmpty())) return
+        
+        val songId = song.id.orEmpty()
+        downloadingSongs = downloadingSongs + songId
+        
+        coroutineScope.launch {
+            try {
+                val success = repo.downloadSong(song)
+                if (success) {
+                    // Update downloaded songs list
+                    refreshOfflineSongs()
+                    // Add to downloaded IDs set
+                    downloadedSongIds = downloadedSongIds + songId
+                }
+            } finally {
+                // Remove from downloading set regardless of outcome
+                downloadingSongs = downloadingSongs - songId
+            }
+        }
+    }
+    
+    // Function to check if a song is downloaded
+    fun isSongDownloaded(song: Song): Boolean {
+        val songId = song.id ?: song.title
+        return downloadedSongIds.contains(songId) || 
+               offlineSongs.any { it.url == song.url || it.title == song.title }
+    }
+    
+    // Initial load of offline songs and download states
+    LaunchedEffect(Unit) {
+        refreshOfflineSongs()
     }
 
     // Load offline songs
@@ -185,18 +227,9 @@ fun LibraryScreen(rootNav: NavController) {
                         rootNav.navigate("player")
                     },
                     onDownloadClick = { song ->
-                        coroutineScope.launch {
-                            downloadingSongs = downloadingSongs + song.url
-                            try {
-                                repo.downloadSong(song)
-                                // Refresh offline songs list
-                                refreshOfflineSongs()
-                            } finally {
-                                downloadingSongs = downloadingSongs - song.url
-                            }
-                        }
+                        downloadSong(song)
                     },
-                    isSongDownloaded = { song -> repo.isSongDownloaded(song) },
+                    isSongDownloaded = { song -> isSongDownloaded(song) },
                     downloadingSongs = downloadingSongs,
                     canLoadMore = canLoadMore,
                     isLoadingMore = isLoadingMore,
@@ -741,7 +774,15 @@ fun OnlineSongItem(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    CircularProgressAnimated(isVisible = isDownloading)
+                    // Show progress indicator when downloading
+                    if (isDownloading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                    
+                    // Download button with proper state
                     IconButton(
                         onClick = onDownloadClick,
                         enabled = !isDownloaded && !isDownloading
@@ -749,7 +790,8 @@ fun OnlineSongItem(
                         Icon(
                             if (isDownloaded) Icons.Default.Check else Icons.Default.Download,
                             contentDescription = if (isDownloaded) "Already Downloaded" else "Download",
-                            tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                            tint = if (isDownloaded) MaterialTheme.colorScheme.primary 
+                                  else MaterialTheme.colorScheme.secondary
                         )
                     }
                 }

@@ -35,23 +35,23 @@ class MusicRepository(private val context: Context) {
         return files.sortedBy { it.name }
     }
 
-    suspend fun downloadSong(song: Song): File? = withContext(Dispatchers.IO) {
-        val dir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: return@withContext null
+    suspend fun downloadSong(song: Song): Boolean = withContext(Dispatchers.IO) {
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: return@withContext false
         if (!dir.exists()) dir.mkdirs()
         val safeId = song.id ?: song.title
         val targetFile = File(dir, sanitizeFilename("${song.artist}-${song.title}-${safeId}.mp3"))
-        if (targetFile.exists()) return@withContext targetFile
+        if (targetFile.exists()) return@withContext true
 
         val client = OkHttpClient()
         val request = Request.Builder().url(song.url).build()
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return@withContext null
-            val body = response.body ?: return@withContext null
+            if (!response.isSuccessful) return@withContext false
+            val body = response.body ?: return@withContext false
             FileOutputStream(targetFile).use { fos ->
                 body.byteStream().copyTo(fos)
             }
         }
-        targetFile
+        true
     }
 
     fun getOfflineSongUri(file: File): Uri = Uri.fromFile(file)
@@ -74,5 +74,19 @@ class MusicRepository(private val context: Context) {
 
     private fun sanitizeFilename(name: String): String {
         return name.replace(Regex("[^a-zA-Z0-9._-]"), "_")
+    }
+    
+    // Add this function to check if a song is downloaded and refresh the state
+    suspend fun refreshDownloadState(songId: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            val file = getOfflineSongFile(songId)
+            file.exists()
+        }
+    }
+    
+    private fun getOfflineSongFile(songId: String): File {
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: return File("")
+        val targetFile = File(dir, sanitizeFilename("$songId.mp3"))
+        return targetFile
     }
 }

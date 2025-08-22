@@ -118,10 +118,13 @@ fun OnlineScreen(rootNav: NavController) {
                                 }
                                 OutlinedButton(onClick = {
                                     scope.launch {
-                                        val file = repo.downloadSong(song)
-                                        snackbarHostState.showSnackbar(
-                                            if (file != null) "Downloaded: ${'$'}{file.name}" else "Download failed"
-                                        )
+                                        val success = repo.downloadSong(song)
+                                        val message = if (success) {
+                                            "Downloaded: ${song.title}"
+                                        } else {
+                                            "Download failed"
+                                        }
+                                        snackbarHostState.showSnackbar(message)
                                     }
                                 }) { Text("Download") }
                             }

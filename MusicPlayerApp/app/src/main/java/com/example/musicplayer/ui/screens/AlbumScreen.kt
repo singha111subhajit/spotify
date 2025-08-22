@@ -1,54 +1,112 @@
 package com.example.DhoonHub.ui.screens
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.ui.Modifier
+import com.example.DhoonHub.player.DhoonHubService
+import com.example.DhoonHub.viewmodel.MusicViewModel
+import androidx.navigation.NavController
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack // Import ArrowBack
+import androidx.compose.material.icons.filled.PlayArrow // Import PlayArrow
+import com.example.DhoonHub.model.Song
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.example.DhoonHub.network.RetrofitProvider
-import com.example.DhoonHub.network.api.MusicApi
-import com.example.DhoonHub.player.DhoonHubService
+import androidx.compose.runtime.*
+import androidx.compose.material3.*
+import androidx.compose.foundation.layout.*
+import com.example.DhoonHub.network.api.Album // Correct import statement
+import androidx.compose.foundation.clickable // Import clickable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AlbumScreen(rootNav: NavController, albumName: String) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val retrofit = remember { RetrofitProvider.getRetrofit(context) }
-    val musicApi = remember { retrofit.create(MusicApi::class.java) }
-    var songs by remember { mutableStateOf(listOf<com.example.DhoonHub.model.Song>()) }
+fun AlbumScreen(
+    rootNav: NavController,
+    albumName: String,
+    musicViewModel: MusicViewModel
+) {
+    val context = LocalContext.current
+    var songs by remember { mutableStateOf(listOf<Song>()) }
     var loading by remember { mutableStateOf(true) }
 
     LaunchedEffect(albumName) {
         loading = true
-        val albums = runCatching { musicApi.getAlbums().albums }.getOrDefault(emptyList())
-        val album = albums.find { it.name == albumName }
-        songs = album?.songs ?: emptyList()
+
+        // Try cache first
+        songs = musicViewModel.getAlbumSongs(albumName)
+
+        if (songs.isEmpty()) {
+            // Fetch from network if not cached
+            val albums: List<Album> = runCatching {
+                musicViewModel.getMusicApi().getAlbums().albums
+            }.getOrDefault(emptyList())
+
+            val album = albums.find { it.name == albumName }
+            songs = album?.songs ?: emptyList()
+
+            if (songs.isNotEmpty()) {
+                musicViewModel.cacheAlbumSongs(albumName, songs)
+            }
+        }
         loading = false
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text(albumName) }, navigationIcon = {
-        IconButton(onClick = { rootNav.popBackStack() }) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(albumName) },
+                navigationIcon = {
+                    IconButton(onClick = { rootNav.popBackStack() }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                }
+            )
         }
-    }) }) { padding ->
+    ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (loading) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
             LazyColumn(Modifier.fillMaxSize()) {
                 items(songs) { song ->
                     ListItem(
-                        leadingContent = { AsyncImage(model = song.thumbnail, contentDescription = song.title) },
+                        modifier = Modifier.clickable {
+                            DhoonHubService.startPlayUrl(
+                                context,
+                                song.url,
+                                title = song.title,
+                                artist = song.artist,
+                                artworkUrl = song.thumbnail
+                            )
+                            rootNav.navigate("player")
+                        },
+                        leadingContent = {
+                            AsyncImage(
+                                model = song.thumbnail,
+                                contentDescription = song.title
+                            )
+                        },
                         headlineContent = { Text(song.title) },
                         supportingContent = { Text(song.artist) },
                         trailingContent = {
-                            TextButton(onClick = {
-                                DhoonHubService.startPlayUrl(context, song.url, title = song.title, artist = song.artist, artworkUrl = song.thumbnail)
+                            IconButton(onClick = {
+                                DhoonHubService.startPlayUrl(
+                                    context,
+                                    song.url,
+                                    title = song.title,
+                                    artist = song.artist,
+                                    artworkUrl = song.thumbnail
+                                )
                                 rootNav.navigate("player")
-                            }) { Text("Play") }
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Filled.PlayArrow,
+                                    contentDescription = "Play"
+                                )
+                            }
                         }
                     )
                     HorizontalDivider()
