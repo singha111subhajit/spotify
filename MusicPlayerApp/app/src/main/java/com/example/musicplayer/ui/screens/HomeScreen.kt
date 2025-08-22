@@ -22,6 +22,10 @@ import com.example.DhoonHub.network.api.Album
 import com.example.DhoonHub.network.api.MusicApi
 import com.example.DhoonHub.repository.AuthRepository
 import com.example.DhoonHub.storage.SettingsStorage
+import com.example.DhoonHub.ui.components.ErrorScreen
+import com.example.DhoonHub.ui.components.LoadingScreen
+import com.example.DhoonHub.ui.components.ShimmerAlbumCard
+import com.example.DhoonHub.ui.components.EmptyScreen
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -113,33 +117,120 @@ fun HomeScreen(rootNav: NavController) {
             )
         }
     ) { padding ->
-        Column(
-            Modifier
+        Box(
+            modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .padding(16.dp)
         ) {
-            if (isLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            if (error != null) Text("Error: $error", color = MaterialTheme.colorScheme.error)
+            when {
+                isLoading && albums.isEmpty() -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            "Good evening",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        LazyVerticalGrid(
+                            columns = GridCells.Adaptive(minSize = 140.dp),
+                            contentPadding = PaddingValues(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            items(6) { // Show 6 shimmer cards
+                                ShimmerAlbumCard()
+                            }
+                        }
+                    }
+                }
+                
+                error != null && albums.isEmpty() -> {
+                    ErrorScreen(
+                        message = error!!,
+                        onRetry = {
+                            coroutineScope.launch { load() }
+                        }
+                    )
+                }
+                
+                albums.isEmpty() && !isLoading -> {
+                    EmptyScreen(
+                        title = "No Music Found",
+                        subtitle = "We couldn't find any albums. Try changing the language or check your connection."
+                    )
+                }
+                
+                else -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp)
+                    ) {
+                        // Show loading indicator at top if refreshing
+                        if (isLoading && albums.isNotEmpty()) {
+                            LinearProgressIndicator(
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                        
+                        // Show error message if there's an error but we have cached data
+                        if (error != null && albums.isNotEmpty()) {
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Failed to refresh: $error",
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    TextButton(
+                                        onClick = {
+                                            coroutineScope.launch { load() }
+                                        }
+                                    ) {
+                                        Text("Retry")
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
 
-            Text(
-                "Good evening",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.height(12.dp))
+                        Text(
+                            "Good evening",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
 
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 140.dp),
-                contentPadding = PaddingValues(4.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                items(albums) { album ->
-                    AlbumCard(album = album, onClick = {
-                        rootNav.navigate("album/${album.name}")
-                    })
+                        LazyVerticalGrid(
+                            columns = GridCells.Adaptive(minSize = 140.dp),
+                            contentPadding = PaddingValues(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            items(albums) { album ->
+                                AlbumCard(album = album, onClick = {
+                                    rootNav.navigate("album/${album.name}")
+                                })
+                            }
+                        }
+                    }
                 }
             }
         }

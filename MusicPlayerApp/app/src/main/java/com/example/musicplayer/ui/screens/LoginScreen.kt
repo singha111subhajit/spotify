@@ -1,50 +1,228 @@
 package com.example.DhoonHub.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.DhoonHub.repository.AuthRepository
+import com.example.DhoonHub.ui.components.LoadingButton
+import com.example.DhoonHub.utils.NetworkResult
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(nav: NavController) {
     val context = LocalContext.current
     val repo = remember { AuthRepository(context) }
+    val focusManager = LocalFocusManager.current
+    
     var userId by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    
     val scope = rememberCoroutineScope()
 
+    // Check if user is already logged in
     LaunchedEffect(Unit) {
-        if (repo.isLoggedIn()) nav.navigate("main") { popUpTo("login") { inclusive = true } }
+        if (repo.isLoggedIn()) {
+            nav.navigate("main") { 
+                popUpTo("login") { inclusive = true } 
+            }
+        }
     }
 
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(text = "Login", style = MaterialTheme.typography.headlineMedium)
-            OutlinedTextField(value = userId, onValueChange = { userId = it }, label = { Text("User ID") })
-            OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, visualTransformation = PasswordVisualTransformation())
-            if (error != null) Text(text = error!!, color = MaterialTheme.colorScheme.error)
-            Button(onClick = {
-                isLoading = true
-                error = null
-                scope.launch {
-                    try {
-                        repo.login(userId, password)
-                        nav.navigate("main") { popUpTo("login") { inclusive = true } }
-                    } catch (e: Exception) {
-                        error = e.message
-                    } finally { isLoading = false }
+    // Clear error when user starts typing
+    LaunchedEffect(userId, password) {
+        if (error != null) {
+            error = null
+        }
+    }
+
+    fun performLogin() {
+        if (userId.isBlank() || password.isBlank()) {
+            error = "Please fill in all fields"
+            return
+        }
+        
+        isLoading = true
+        error = null
+        
+        scope.launch {
+            repo.login(userId.trim(), password).let { result ->
+                when (result) {
+                    is NetworkResult.Success -> {
+                        nav.navigate("main") { 
+                            popUpTo("login") { inclusive = true } 
+                        }
+                    }
+                    is NetworkResult.Error -> {
+                        error = result.message
+                    }
+                    is NetworkResult.Loading -> {
+                        // Handle loading state if needed
+                    }
                 }
-            }, enabled = !isLoading) { Text("Login") }
-            TextButton(onClick = { nav.navigate("register") }) { Text("No account? Register") }
+                isLoading = false
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(32.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header
+                Text(
+                    text = "Welcome Back",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "Sign in to continue to DhoonHub",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Email Field
+                OutlinedTextField(
+                    value = userId,
+                    onValueChange = { userId = it },
+                    label = { Text("Email") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Email,
+                            contentDescription = "Email"
+                        )
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Email,
+                        imeAction = ImeAction.Next
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                    ),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading
+                )
+                
+                // Password Field
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Password"
+                        )
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                            )
+                        }
+                    },
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = { 
+                            focusManager.clearFocus()
+                            performLogin()
+                        }
+                    ),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading
+                )
+                
+                // Error Message
+                if (error != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = error!!,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Login Button
+                LoadingButton(
+                    onClick = { performLogin() },
+                    modifier = Modifier.fillMaxWidth(),
+                    isLoading = isLoading
+                ) {
+                    Text("Sign In")
+                }
+                
+                // Register Link
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "Don't have an account? ",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    TextButton(
+                        onClick = { nav.navigate("register") },
+                        enabled = !isLoading
+                    ) {
+                        Text("Sign Up")
+                    }
+                }
+            }
         }
     }
 }
