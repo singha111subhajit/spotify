@@ -1,4 +1,3 @@
-
 package com.example.DhoonHub.ui.screens
 
 import androidx.compose.foundation.background
@@ -33,36 +32,27 @@ fun PlayerScreen(nav: NavController) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val uiState by PlaybackStateHolder.uiState.collectAsState()
 
-    // Networking & API
     val retrofit = remember { RetrofitProvider.getRetrofit(context) }
     val musicApi = remember { retrofit.create(MusicApi::class.java) }
-    // Create the repository instance at the top level
     val repo = remember { MusicRepository(context) }
 
     var related by remember { mutableStateOf(listOf<Song>()) }
     val scope = rememberCoroutineScope()
 
-    // Track download state
     var isDownloaded by remember { mutableStateOf(false) }
     var downloading by remember { mutableStateOf(false) }
-    
-    // Check download state whenever the current URL changes
+
+    // ✅ NEW: collapsible related section
+    var relatedExpanded by remember { mutableStateOf(true) }
+
     LaunchedEffect(uiState.currentUrl, uiState.title, uiState.artist) {
         val url = uiState.currentUrl ?: return@LaunchedEffect
-        if (url.startsWith("http")) {
-            val song = Song(
-                id = url,
-                title = uiState.title,
-                artist = uiState.artist,
-                url = url
-            )
-            isDownloaded = repo.isSongDownloaded(song)
-        } else {
-            isDownloaded = true // Local file is already "downloaded"
-        }
+        isDownloaded = if (url.startsWith("http")) {
+            val song = Song(id = url, title = uiState.title, artist = uiState.artist, url = url)
+            repo.isSongDownloaded(song)
+        } else true
     }
 
-    // Fetch related songs when artist changes
     LaunchedEffect(uiState.artist) {
         val q = uiState.artist.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
         related = runCatching { musicApi.search(q).songs }.getOrDefault(emptyList())
@@ -85,7 +75,6 @@ fun PlayerScreen(nav: NavController) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Background artwork
             AsyncImage(
                 model = uiState.artworkUrl,
                 contentDescription = null,
@@ -95,7 +84,6 @@ fun PlayerScreen(nav: NavController) {
                 error = painterResource(R.drawable.ic_music_note)
             )
 
-            // Overlay
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
 
             Column(
@@ -105,7 +93,7 @@ fun PlayerScreen(nav: NavController) {
                 verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Top 70%: player controls
+                // Player controls
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -125,7 +113,6 @@ fun PlayerScreen(nav: NavController) {
                     )
                     Spacer(Modifier.height(16.dp))
 
-                    // Seek bar
                     val duration = uiState.durationMs.takeIf { it > 0 } ?: 1L
                     Slider(
                         value = (uiState.positionMs / duration.toFloat()).coerceIn(0f, 1f),
@@ -169,15 +156,10 @@ fun PlayerScreen(nav: NavController) {
                             )
                         }
 
-                        // Download button
-                        // Remove this line as we already defined repo at the top
-                        // val repo = remember { MusicRepository(context) }
                         val currentUrl = uiState.currentUrl
-                        
                         IconButton(onClick = {
                             val url = currentUrl ?: return@IconButton
                             if (!url.startsWith("http") || isDownloaded || downloading) return@IconButton
-                            
                             downloading = true
                             val song = Song(
                                 id = url,
@@ -186,11 +168,9 @@ fun PlayerScreen(nav: NavController) {
                                 url = url,
                                 thumbnail = uiState.artworkUrl
                             )
-                            
                             scope.launch {
                                 try {
-                                    val success = repo.downloadSong(song)
-                                    if (success) {
+                                    if (repo.downloadSong(song)) {
                                         isDownloaded = true
                                     }
                                 } finally {
@@ -219,44 +199,66 @@ fun PlayerScreen(nav: NavController) {
 
                 Spacer(Modifier.height(8.dp))
 
-                // Bottom 30%: related songs
+                // ✅ Collapsible related songs section
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(0.3f)
                 ) {
-                    Text(
-                        "More by ${uiState.artist}",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White
-                    )
-                    LazyColumn(Modifier.fillMaxSize()) {
-                        items(related) { song ->
-                            ListItem(
-                                leadingContent = {
-                                    AsyncImage(
-                                        model = song.thumbnail,
-                                        contentDescription = song.title,
-                                        modifier = Modifier.size(48.dp),
-                                        placeholder = painterResource(R.drawable.ic_music_note),
-                                        error = painterResource(R.drawable.ic_music_note)
-                                    )
-                                },
-                                headlineContent = { Text(song.title) },
-                                supportingContent = { Text(song.artist) },
-                                trailingContent = {
-                                    TextButton(onClick = {
-                                        DhoonHubService.startPlayUrl(
-                                            context,
-                                            song.url,
-                                            title = song.title,
-                                            artist = song.artist,
-                                            artworkUrl = song.thumbnail
-                                        )
-                                    }) { Text("Play") }
-                                }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            "More by ${uiState.artist}",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White
+                        )
+                        IconButton(onClick = { relatedExpanded = !relatedExpanded }) {
+                            Icon(
+                                if (relatedExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (relatedExpanded) "Collapse" else "Expand",
+                                tint = Color.White
                             )
-                            HorizontalDivider()
+                        }
+                    }
+
+                    if (relatedExpanded) {
+                        LazyColumn(Modifier.fillMaxSize()) {
+                            items(related) { song ->
+                                ListItem(
+                                    leadingContent = {
+                                        AsyncImage(
+                                            model = song.thumbnail,
+                                            contentDescription = song.title,
+                                            modifier = Modifier.size(48.dp),
+                                            placeholder = painterResource(R.drawable.ic_music_note),
+                                            error = painterResource(R.drawable.ic_music_note)
+                                        )
+                                    },
+                                    headlineContent = { Text(song.title) },
+                                    supportingContent = { Text(song.artist) },
+                                    trailingContent = {
+                                        IconButton(onClick = {
+                                            DhoonHubService.startPlayUrl(
+                                                context,
+                                                song.url,
+                                                title = song.title,
+                                                artist = song.artist,
+                                                artworkUrl = song.thumbnail
+                                            )
+                                        }) {
+                                            Icon(
+                                                Icons.Default.PlayArrow,
+                                                contentDescription = "Play",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                )
+                                HorizontalDivider()
+                            }
                         }
                     }
                 }
