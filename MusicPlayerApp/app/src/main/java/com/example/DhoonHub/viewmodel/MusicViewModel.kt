@@ -46,6 +46,14 @@ class MusicViewModel(private val context: Context) : ViewModel() {
         private set
     var searchError by mutableStateOf<String?>(null)
         private set
+
+    // Album search results
+    var albumSearchResults by mutableStateOf<List<Song>>(emptyList())
+        private set
+    var isSearchingAlbums by mutableStateOf(false)
+        private set
+    var albumSearchError by mutableStateOf<String?>(null)
+        private set
     
     // Album details
     private val albumSongsCache = mutableMapOf<String, List<Song>>()
@@ -170,6 +178,26 @@ class MusicViewModel(private val context: Context) : ViewModel() {
                 searchError = "Search failed: ${e.message}"
             } finally {
                 isSearching = false
+            }
+        }
+    }
+
+    fun searchAlbums(albumName: String) {
+        if (albumName.isBlank()) {
+            albumSearchResults = emptyList()
+            return
+        }
+
+        isSearchingAlbums = true
+        albumSearchError = null
+
+        viewModelScope.launch {
+            try {
+                albumSearchResults = musicRepository.getAlbumSongs(albumName)
+            } catch (e: Exception) {
+                albumSearchError = "Album search failed: ${e.message}"
+            } finally {
+                isSearchingAlbums = false
             }
         }
     }

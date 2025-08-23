@@ -58,4 +58,7 @@ interface MusicApi {
 
     @GET("api/artists")
     suspend fun getArtists(): ArtistsResponse
+
+    @GET("api/album_songs")
+    suspend fun getAlbumSongs(@Query("album") album: String): SongsResponse
 }

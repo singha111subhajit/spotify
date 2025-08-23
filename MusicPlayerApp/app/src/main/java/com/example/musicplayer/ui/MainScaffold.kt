@@ -20,7 +20,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.DhoonHub.ui.components.MiniPlayer
-import com.example.DhoonHub.ui.screens.HomeScreen
+import com.example.musicplayer.ui.screens.HomeScreen
 import com.example.DhoonHub.ui.screens.LibraryScreen
 import com.example.DhoonHub.ui.screens.ProfileScreen
 import com.example.DhoonHub.ui.screens.SearchScreen

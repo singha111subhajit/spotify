@@ -27,6 +27,8 @@ class MusicRepository(private val context: Context) {
     suspend fun removeSongFromPlaylist(playlistId: Int, songDbId: Int) =
         musicApi.removeSongFromPlaylist(playlistId, songDbId)
 
+    suspend fun getAlbumSongs(albumName: String): List<Song> = musicApi.getAlbumSongs(albumName).songs
+
     fun getOfflineSongs(): List<File> {
         val dir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
         val files = dir?.listFiles()?.filter { 
