@@ -1,5 +1,4 @@
-
-package com.example.musicplayer.ui.screens
+package com.example.DhoonHub.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -32,7 +31,8 @@ import com.example.DhoonHub.ui.components.EmptyScreen
 import com.example.DhoonHub.viewmodel.MusicViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
-import com.example.DhoonHub.player.DhoonHubService  // Add this missing import
+import com.example.DhoonHub.player.DhoonHubService
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState // Import for LazyGridState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,6 +51,18 @@ fun HomeScreen(
     val coroutineScope = rememberCoroutineScope()
 
     var albumSearchQuery by remember { mutableStateOf("") }
+
+    val albumGridState = rememberLazyGridState() // State for infinite scrolling
+
+    // Detect scroll to end for infinite scrolling
+    LaunchedEffect(albumGridState) {
+        snapshotFlow { albumGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+            .collect { lastIndex ->
+                if (lastIndex != null && lastIndex >= musicViewModel.albums.size - 1 && musicViewModel.canLoadMoreAlbums && !musicViewModel.isLoadingAlbums && !musicViewModel.isPaginatingAlbums) {
+                    musicViewModel.loadMoreAlbums()
+                }
+            }
+    }
 
     Scaffold(
         topBar = {
@@ -256,6 +268,7 @@ fun HomeScreen(
                             Spacer(modifier = Modifier.height(12.dp))
 
                             LazyVerticalGrid(
+                                state = albumGridState, // Assign the state
                                 columns = GridCells.Adaptive(minSize = 140.dp),
                                 contentPadding = PaddingValues(4.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -266,6 +279,19 @@ fun HomeScreen(
                                     AlbumCard(album = album, onClick = {
                                         rootNav.navigate("album/${album.name}")
                                     })
+                                }
+                                // Loading indicator for pagination
+                                if (musicViewModel.isPaginatingAlbums) {
+                                    item {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(16.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            CircularProgressIndicator()
+                                        }
+                                    }
                                 }
                             }
                         }

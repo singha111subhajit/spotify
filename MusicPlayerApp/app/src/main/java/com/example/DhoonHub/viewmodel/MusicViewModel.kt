@@ -1,4 +1,3 @@
-
 package com.example.DhoonHub.viewmodel
 
 import android.content.Context
@@ -61,36 +60,54 @@ class MusicViewModel(private val context: Context) : ViewModel() {
     private val musicApi = RetrofitProvider.getRetrofit(context).create(MusicApi::class.java)
     private val musicRepository = MusicRepository(context)
     
+    // Pagination state for albums
+    var currentAlbumPage by mutableStateOf(1)
+        private set
+    var canLoadMoreAlbums by mutableStateOf(true)
+        private set
+    var isPaginatingAlbums by mutableStateOf(false) // New state for pagination loading indicator
+        private set
+
     init {
         // Load initial data
-        loadAlbums()
+        loadAlbums(page = currentAlbumPage) // Call with initial page
         loadOfflineSongs()
     }
     
-    fun loadAlbums() {
-        if (albums.isNotEmpty()) return // Don't reload if we already have data
-        
-        isLoadingAlbums = true
-        albumsError = null
-        
+    fun loadAlbums(page: Int = 1, perPage: Int = 20) { // Add parameters
+        if (isLoadingAlbums || isPaginatingAlbums || !canLoadMoreAlbums) return // Prevent multiple loads
+
+        if (page == 1) { // Only show full loading indicator for the first page
+            isLoadingAlbums = true
+            albumsError = null
+        } else {
+            isPaginatingAlbums = true // Show pagination loading indicator for subsequent pages
+        }
+
         viewModelScope.launch {
             try {
-                val fetchedAlbums = runCatching { musicApi.getAlbums().albums }
+                val fetchedAlbums = runCatching { musicApi.getAlbums(page = page, perPage = perPage).albums } // Pass page and perPage
                     .getOrElse {
                         albumsError = "Failed to fetch albums: ${it.message}"
                         emptyList()
                     }
-                
+
                 if (fetchedAlbums.isNotEmpty()) {
-                    albums = fetchedAlbums.shuffled()
+                    albums = if (page == 1) fetchedAlbums.shuffled() else albums + fetchedAlbums.shuffled() // Append for pagination
+                    currentAlbumPage = page
+                    canLoadMoreAlbums = fetchedAlbums.size == perPage // Update canLoadMoreAlbums
                 } else {
-                    // Try to create albums from songs if no albums were returned
+                    canLoadMoreAlbums = false // No more albums to load
+                }
+
+                // Handle creating albums from songs if no albums were returned (existing logic)
+                if (albums.isEmpty() && page == 1) { // Only do this fallback for the first page if no albums
                     val songs = runCatching { musicApi.getSongs().songs }
                         .getOrElse {
                             albumsError = "Failed to fetch songs: ${it.message}"
                             emptyList()
                         }
-                    
+
                     if (songs.isNotEmpty()) {
                         val grouped = songs.groupBy { it.album ?: "Unknown Album" }
                         albums = grouped.entries.mapIndexed { index, entry ->
@@ -105,13 +122,23 @@ class MusicViewModel(private val context: Context) : ViewModel() {
                                 songs = groupSongs
                             )
                         }.shuffled()
+                        canLoadMoreAlbums = false // No pagination for generated albums
                     }
                 }
+
             } catch (e: Exception) {
                 albumsError = "Error loading albums: ${e.message}"
+                canLoadMoreAlbums = false // Stop loading on error
             } finally {
                 isLoadingAlbums = false
+                isPaginatingAlbums = false
             }
+        }
+    }
+
+    fun loadMoreAlbums() {
+        if (canLoadMoreAlbums && !isLoadingAlbums && !isPaginatingAlbums) {
+            loadAlbums(page = currentAlbumPage + 1)
         }
     }
     
@@ -238,8 +265,11 @@ class MusicViewModel(private val context: Context) : ViewModel() {
         onlineSongs = emptyList()
         offlineSongs = emptyList()
         albumSongsCache.clear()
-        
-        loadAlbums()
+        currentAlbumPage = 1 // Reset pagination
+        canLoadMoreAlbums = true // Reset pagination
+        isPaginatingAlbums = false // Reset pagination
+
+        loadAlbums(page = currentAlbumPage) // Load first page
         loadOnlineSongs()
         loadOfflineSongs()
     }
