@@ -562,38 +562,18 @@ def api_search():
         print(f"Search request: query='{query}', page={page}, per_page={per_page}")
         if not query:
             return jsonify({'error': 'Query parameter required'}), 400
-        # Improved static song search with tokenization
+        # Search static songs first
         static_songs = get_static_songs()
-        query_lower = query.lower().strip()
-        query_tokens = query_lower.split()
-
-        # 1. Exact match (title or artist)
-        exact_static = [song for song in static_songs if song['title'].lower() == query_lower or song['artist'].lower() == query_lower]
-        # 2. Partial match (token in title/artist)
-        partial_static = [song for song in static_songs if any(token in song['title'].lower() or token in song['artist'].lower() for token in query_tokens) and song not in exact_static]
-
-        # 3. Other songs from same album/movie as top match
-        album_static = []
-        if exact_static:
-            top_album = exact_static[0].get('album')
-            if top_album:
-                album_static = [song for song in static_songs if song.get('album') == top_album and song not in exact_static and song not in partial_static]
-
-        # 4. All other static songs (not already included)
-        other_static = [song for song in static_songs if song not in exact_static and song not in partial_static and song not in album_static]
-
-        # Repeat for JioSaavn
+        matching_static = [
+            song for song in static_songs 
+            if query.lower() in song['title'].lower() or query.lower() in song['artist'].lower()
+        ]
+        print(f"Found {len(matching_static)} matching static songs")
+        # Search JioSaavn API
         jiosaavn_songs, total_found = search_jiosaavn(query, page, per_page)
-        exact_jio = [song for song in jiosaavn_songs if song['title'].lower() == query_lower or (song.get('artist') and song['artist'].lower() == query_lower)]
-        partial_jio = [song for song in jiosaavn_songs if any(token in song['title'].lower() or (song.get('artist') and token in song['artist'].lower()) for token in query_tokens) and song not in exact_jio]
-        album_jio = []
-        if exact_jio:
-            top_album = exact_jio[0].get('album')
-            if top_album:
-                album_jio = [song for song in jiosaavn_songs if song.get('album') == top_album and song not in exact_jio and song not in partial_jio]
-        other_jio = [song for song in jiosaavn_songs if song not in exact_jio and song not in partial_jio and song not in album_jio]
-
-        # Secure all songs
+        print(f"Found {len(jiosaavn_songs)} JioSaavn songs")
+        # Combine results (static songs first)
+        # Ensure all external URLs are HTTPS in the response
         def secure_song(song):
             if song.get('source') == 'jiosaavn':
                 song = song.copy()
@@ -602,28 +582,17 @@ def api_search():
                     song['thumbnail'] = upgrade_url(song.get('thumbnail'))
             return song
 
-        # Final ordered results: exact > album > partial > other
-        all_results = [
-            *map(secure_song, exact_static + exact_jio),
-            *map(secure_song, album_static + album_jio),
-            *map(secure_song, partial_static + partial_jio),
-            *map(secure_song, other_static + other_jio)
-        ]
-
-        # Paginate combined results
-        start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
-        paginated_results = all_results[start_idx:end_idx]
+        all_results = [secure_song(song) for song in matching_static + jiosaavn_songs]
         response_data = {
-            'songs': paginated_results,
-            'total': len(all_results),
+            'songs': all_results,
+            'total': len(matching_static) + total_found,
             'page': page,
             'per_page': per_page,
             'query': query,
-            'static_matches': len(exact_static) + len(album_static) + len(partial_static) + len(other_static),
+            'static_matches': len(matching_static),
             'api_matches': len(jiosaavn_songs)
         }
-        print(f"Returning {len(paginated_results)} paginated songs (of {len(all_results)} total)")
+        print(f"Returning {len(all_results)} total songs")
         return jsonify(response_data)
     except Exception as e:
         print(f"Error in api_search: {e}")
