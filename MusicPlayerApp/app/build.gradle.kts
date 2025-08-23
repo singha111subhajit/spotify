@@ -56,6 +56,14 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    lint {
+        disable += "CompositionLocalNaming"
+    }
+    
+    lint {
+        disable += "CompositionLocalNaming"
+    }
 }
 
 dependencies {

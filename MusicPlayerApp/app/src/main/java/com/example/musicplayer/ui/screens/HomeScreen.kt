@@ -31,6 +31,7 @@ import com.example.DhoonHub.ui.components.EmptyScreen
 import com.example.DhoonHub.viewmodel.MusicViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
+import com.example.DhoonHub.player.DhoonHubService  // Add this missing import
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,7 +115,7 @@ fun HomeScreen(
                 )
             } else if (albumSearchQuery.isNotBlank() && musicViewModel.albumSearchResults.isEmpty()) {
                 Text(
-                    "No albums found for \"${albumSearchQuery}\"",
+                    text = "No albums found for $albumSearchQuery",
                     modifier = Modifier.padding(16.dp)
                 )
             } else if (musicViewModel.albumSearchResults.isNotEmpty()) {
@@ -127,7 +128,14 @@ fun HomeScreen(
                 ) {
                     items(musicViewModel.albumSearchResults) { song ->
                         SongSearchCard(song = song, onClick = {
-                            rootNav.navigate("album/${song.title}")
+                            DhoonHubService.startPlayUrl(
+                                context,
+                                song.url,
+                                title = song.title,
+                                artist = song.artist,
+                                artworkUrl = song.thumbnail
+                            )
+                            rootNav.navigate("player")
                         })
                     }
                 }
