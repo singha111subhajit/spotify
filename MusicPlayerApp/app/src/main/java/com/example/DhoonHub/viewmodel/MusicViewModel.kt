@@ -254,6 +254,11 @@ class MusicViewModel(private val context: Context) : ViewModel() {
         albumSongsCache[albumName] = songs
     }
     
+    // Add this method to your MusicViewModel class
+    fun clearAlbumSearchResults() {
+        albumSearchResults = emptyList()
+    }
+    
     // Factory to create the ViewModel with context
     class Factory(private val context: Context) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")

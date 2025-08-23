@@ -54,7 +54,16 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Home") },
+                title = { 
+                    Text(
+                        "Home",
+                        modifier = Modifier.clickable {
+                            // Refresh the home screen when "Home" is clicked
+                            albumSearchQuery = ""
+                            musicViewModel.refreshAll()
+                        }
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { /* root */ }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -87,12 +96,20 @@ fun HomeScreen(
     ) { paddingValues ->
         Column(
             modifier = Modifier
-                .padding(paddingValues) // Changed from it to padding
+                .padding(paddingValues)
                 .fillMaxSize()
         ) {
             OutlinedTextField(
                 value = albumSearchQuery,
-                onValueChange = { albumSearchQuery = it },
+                onValueChange = { query ->
+                    albumSearchQuery = query
+                    if (query.isBlank()) {
+                        // Clear search results when query is empty
+                        musicViewModel.clearAlbumSearchResults()
+                    } else {
+                        musicViewModel.searchAlbums(query)
+                    }
+                },
                 label = { Text("Search Albums") },
                 singleLine = true,
                 modifier = Modifier
