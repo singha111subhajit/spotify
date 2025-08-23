@@ -1,3 +1,4 @@
+
 package com.example.musicplayer.ui.screens
 
 import androidx.compose.foundation.clickable
@@ -58,9 +59,10 @@ fun HomeScreen(
                     Text(
                         "Home",
                         modifier = Modifier.clickable {
-                            // Refresh the home screen when "Home" is clicked
-                            albumSearchQuery = ""
-                            musicViewModel.refreshAll()
+                            // Clear search query and results when "Home" is clicked
+                            albumSearchQuery = ""  // Clear the search query
+                            musicViewModel.clearAlbumSearchResults()  // Clear search results
+                            musicViewModel.refreshAll()  // Refresh the albums
                         }
                     )
                 },
