@@ -10,7 +10,7 @@ import androidx.compose.material.icons.filled.PlayArrow // Import PlayArrow
 import com.example.DhoonHub.model.Song
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import coil.compose.AsyncImage
 import androidx.compose.runtime.*
 import androidx.compose.material3.*
@@ -56,13 +56,13 @@ fun AlbumScreen(
                 LinearProgressIndicator(Modifier.fillMaxWidth())
             }
             LazyColumn(Modifier.fillMaxSize()) {
-                items(songs) { song ->
+                itemsIndexed(songs) { index, song ->
                     ListItem(
                         modifier = Modifier.clickable {
                             DhoonHubService.startPlayUrl(
                                 context,
-                                listOf(song),
-                                0
+                                songs,
+                                index
                             )
                             rootNav.navigate("player")
                         },
@@ -78,8 +78,8 @@ fun AlbumScreen(
                             IconButton(onClick = {
                                 DhoonHubService.startPlayUrl(
                                     context,
-                                    listOf(song),
-                                    0
+                                    songs,
+                                    index
                                 )
                                 rootNav.navigate("player")
                             }) {
