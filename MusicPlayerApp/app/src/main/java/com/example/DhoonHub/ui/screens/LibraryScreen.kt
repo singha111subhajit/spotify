@@ -218,9 +218,11 @@ fun LibraryScreen(
                     onSearchQueryChange = { q -> onlineSearchQuery = q },
                     onSongClick = { song ->
                         // Stream directly without auto-download
+                        val startIndex = onlineSongs.indexOf(song)
                         DhoonHubService.startPlayUrl(
                             context,
-                            songs = listOf(song)
+                            songs = onlineSongs,
+                            startIndex = startIndex
                         )
                         rootNav.navigate("player")
                     },
