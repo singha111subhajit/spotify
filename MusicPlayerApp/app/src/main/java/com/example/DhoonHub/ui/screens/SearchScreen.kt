@@ -76,8 +76,9 @@ fun SearchScreen(rootNav: NavController) {
                                 val url = song.url
                                 if (url.isNotBlank()) {
                                     runCatching {
-                                        com.example.DhoonHub.player.DhoonHubService.startPlayUrl(context, url,
-                                            title = song.title, artist = song.artist, artworkUrl = song.thumbnail)
+                                        com.example.DhoonHub.player.DhoonHubService.startPlayUrl(context, 
+                                            listOf(song),
+                                            0)
                                         rootNav.navigate("player")
                                     }
                                 }

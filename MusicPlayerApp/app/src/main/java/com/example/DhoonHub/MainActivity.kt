@@ -61,8 +61,7 @@ fun AppNav() {
                 factory = com.example.DhoonHub.viewmodel.MusicViewModel.Factory(context)
             )
             
-            // Collect playback state to know if music is playing
-            val playbackState by PlaybackStateHolder.uiState.collectAsState()
+            
             
             NavHost(navController = navController, startDestination = "login") {
                 composable("login") { LoginScreen(navController) }

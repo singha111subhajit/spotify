@@ -61,10 +61,8 @@ fun AlbumScreen(
                         modifier = Modifier.clickable {
                             DhoonHubService.startPlayUrl(
                                 context,
-                                song.url,
-                                title = song.title,
-                                artist = song.artist,
-                                artworkUrl = song.thumbnail
+                                listOf(song),
+                                0
                             )
                             rootNav.navigate("player")
                         },
@@ -80,10 +78,8 @@ fun AlbumScreen(
                             IconButton(onClick = {
                                 DhoonHubService.startPlayUrl(
                                     context,
-                                    song.url,
-                                    title = song.title,
-                                    artist = song.artist,
-                                    artworkUrl = song.thumbnail
+                                    listOf(song),
+                                    0
                                 )
                                 rootNav.navigate("player")
                             }) {

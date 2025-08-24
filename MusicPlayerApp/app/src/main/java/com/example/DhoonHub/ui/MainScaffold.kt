@@ -75,7 +75,7 @@ fun MainScaffold(
             ) {
                 composable(Screen.Home.route) { HomeScreen(rootNavController, musicViewModel) }
                 composable(Screen.Search.route) { SearchScreen(rootNavController) }
-                composable(Screen.Library.route) { LibraryScreen(rootNavController) }
+                composable(Screen.Library.route) { LibraryScreen(rootNavController, musicViewModel.musicRepository) }
                 composable(Screen.Profile.route) { ProfileScreen(rootNavController) }
             }
             

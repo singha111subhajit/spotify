@@ -58,7 +58,7 @@ class MusicViewModel(private val context: Context) : ViewModel() {
     private val albumSongsCache = mutableMapOf<String, List<Song>>()
     
     private val musicApi = RetrofitProvider.getRetrofit(context).create(MusicApi::class.java)
-    private val musicRepository = MusicRepository(context)
+    val musicRepository = MusicRepository(context)
     
     // Pagination state for albums
     var currentAlbumPage by mutableStateOf(1)

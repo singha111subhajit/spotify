@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.ContentScale
 import androidx.navigation.NavController
 import android.content.Context
 import coil.compose.AsyncImage
@@ -58,7 +59,9 @@ fun HomeScreen(
     LaunchedEffect(albumGridState) {
         snapshotFlow { albumGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
             .collect { lastIndex ->
+                println("HomeScreen: lastIndex is $lastIndex, albums.size is ${musicViewModel.albums.size}")
                 if (lastIndex != null && lastIndex >= musicViewModel.albums.size - 1 && musicViewModel.canLoadMoreAlbums && !musicViewModel.isLoadingAlbums && !musicViewModel.isPaginatingAlbums) {
+                    android.util.Log.d("DhoonHub", "HomeScreen: Loading more albums.")
                     musicViewModel.loadMoreAlbums()
                 }
             }
@@ -161,10 +164,8 @@ fun HomeScreen(
                         SongSearchCard(song = song, onClick = {
                             DhoonHubService.startPlayUrl(
                                 context,
-                                song.url,
-                                title = song.title,
-                                artist = song.artist,
-                                artworkUrl = song.thumbnail
+                                musicViewModel.albumSearchResults,
+                                musicViewModel.albumSearchResults.indexOf(song)
                             )
                             rootNav.navigate("player")
                         })
@@ -321,7 +322,8 @@ fun AlbumCard(album: Album, onClick: () -> Unit) {
                     .fillMaxWidth()
                     .height(120.dp),
                 placeholder = painterResource(R.drawable.ic_music_note),
-                error = painterResource(R.drawable.ic_music_note)
+                error = painterResource(R.drawable.ic_music_note),
+                contentScale = ContentScale.Crop
             )
             Text(album.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
             Text(
@@ -355,7 +357,8 @@ fun SongSearchCard(song: com.example.DhoonHub.model.Song, onClick: () -> Unit) {
                     .fillMaxWidth()
                     .height(120.dp),
                 placeholder = painterResource(R.drawable.ic_music_note),
-                error = painterResource(R.drawable.ic_music_note)
+                error = painterResource(R.drawable.ic_music_note),
+                contentScale = ContentScale.Crop
             )
             Text(song.title, style = MaterialTheme.typography.titleMedium, maxLines = 1)
             Text(
@@ -368,23 +371,3 @@ fun SongSearchCard(song: com.example.DhoonHub.model.Song, onClick: () -> Unit) {
     }
 }
 
-fun getAlbumSongs(albumName: String, context: Context, onResult: (List<com.example.DhoonHub.model.Song>) -> Unit) {
-    // This function is not ideal, consider moving to ViewModel
-    val musicApi = RetrofitProvider.getMusicApi(context)
-    
-    // This is a simplistic implementation. In a real app, you'd use a proper coroutine scope.
-    // For this example, we'll just launch a new one.
-    kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-        try {
-            val response = musicApi.getAlbumSongs(albumName)
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                onResult(response.songs)
-            }
-        } catch (e: Exception) {
-            // Handle error
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                onResult(emptyList())
-            }
-        }
-    }
-}

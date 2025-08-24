@@ -38,9 +38,11 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(rootNav: NavController) {
+fun LibraryScreen(
+    rootNav: NavController,
+    repo: MusicRepository
+) {
     val context = LocalContext.current
-    val repo = remember { MusicRepository(context) }
     val coroutineScope = rememberCoroutineScope()
     
     var currentTab by remember { mutableStateOf(0) }
@@ -218,10 +220,7 @@ fun LibraryScreen(rootNav: NavController) {
                         // Stream directly without auto-download
                         DhoonHubService.startPlayUrl(
                             context,
-                            url = song.url,
-                            title = song.title,
-                            artist = song.artist,
-                            artworkUrl = song.thumbnail
+                            songs = listOf(song)
                         )
                         rootNav.navigate("player")
                     },
@@ -665,7 +664,6 @@ fun OfflineSongItem(song: Song, onClick: () -> Unit, onDelete: () -> Unit) {
 
 @Composable
 private fun EmbeddedArtImage(filePath: String, size: Dp) {
-    val context = LocalContext.current
     val bitmapState = produceState<android.graphics.Bitmap?>(initialValue = null, filePath) {
         value = withContext(Dispatchers.IO) {
             try {

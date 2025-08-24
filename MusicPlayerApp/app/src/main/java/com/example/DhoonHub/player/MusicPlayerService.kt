@@ -26,6 +26,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import com.example.DhoonHub.model.Song
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -37,6 +38,8 @@ class DhoonHubService : Service() {
     private lateinit var player: ExoPlayer
     private lateinit var mediaSession: MediaSessionCompat
     private var tickerJob: Job? = null
+    private var currentPlaylist: List<com.example.DhoonHub.model.Song> = emptyList()
+    private var currentPlaylistIndex: Int = -1
 
     override fun onCreate() {
         super.onCreate()
@@ -69,6 +72,9 @@ class DhoonHubService : Service() {
                 if (playbackState == Player.STATE_READY) {
                     val dur = runCatching { player.duration }.getOrElse { 0L }
                     if (dur > 0) PlaybackStateHolder.update(durationMs = dur)
+                } else if (playbackState == Player.STATE_ENDED) {
+                    // Automatically play next song when current one ends
+                    next()
                 }
             }
         })
@@ -78,19 +84,23 @@ class DhoonHubService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Start foreground immediately to comply with restrictions
         startForeground(NOTIFICATION_ID, buildNotification())
+        @Suppress("DEPRECATION", "UNCHECKED_CAST")
         return try {
             MediaButtonReceiver.handleIntent(mediaSession, intent)
             when (intent?.action) {
                 ACTION_PLAY_URL -> {
-                    val url = intent.getStringExtra(EXTRA_URL)
-                    val title = intent.getStringExtra(EXTRA_TITLE)
-                    val artist = intent.getStringExtra(EXTRA_ARTIST)
-                    val artwork = intent.getStringExtra(EXTRA_ARTWORK)
-                    if (!url.isNullOrBlank()) playUri(Uri.parse(url), title, artist, artwork)
+                    val playlist = intent.getSerializableExtra(EXTRA_PLAYLIST) as? ArrayList<Song>
+                    val startIndex = intent.getIntExtra(EXTRA_START_INDEX, 0)
+                    if (!playlist.isNullOrEmpty()) {
+                        setPlaylistAndPlay(playlist, startIndex)
+                    }
                 }
                 ACTION_PLAY_FILE -> {
                     val path = intent.getStringExtra(EXTRA_FILE_PATH)
-                    if (!path.isNullOrBlank()) playUri(Uri.fromFile(java.io.File(path)), null, null, null)
+                    if (!path.isNullOrBlank()) {
+                        val song = Song(id = path, title = "Local File", artist = "", url = path, thumbnail = null)
+                        setPlaylistAndPlay(listOf(song), 0)
+                    }
                 }
                 ACTION_TOGGLE_PLAY_PAUSE -> if (player.isPlaying) pause() else play()
                 ACTION_NEXT -> next()
@@ -127,34 +137,34 @@ class DhoonHubService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    fun setQueueAndPlay(uris: List<Uri>, startIndex: Int = 0) {
-        player.setMediaItems(uris.map { MediaItem.fromUri(it) }, startIndex, 0L)
+    fun setPlaylistAndPlay(songs: List<Song>, startIndex: Int = 0) {
+        currentPlaylist = songs
+        currentPlaylistIndex = startIndex
+
+        val mediaItems = songs.map { MediaItem.fromUri(Uri.parse(it.url)) }
+        player.setMediaItems(mediaItems, startIndex, 0L)
         player.prepare()
         player.playWhenReady = true
-        val dur = runCatching { player.duration }.getOrElse { 0L }
-        if (dur > 0) PlaybackStateHolder.update(durationMs = dur)
+
+        val currentSong = songs.getOrNull(startIndex)
+        if (currentSong != null) {
+            updateMetadata(currentSong.title, currentSong.artist, currentSong.thumbnail)
+            val dur = runCatching { player.duration }.getOrElse { 0L }
+            val isLocal = currentSong.url.startsWith("file")
+            PlaybackStateHolder.update(
+                title = currentSong.title,
+                artist = currentSong.artist,
+                artworkUrl = currentSong.thumbnail,
+                durationMs = if (dur > 0) dur else PlaybackStateHolder.uiState.value.durationMs,
+                currentUrl = currentSong.url,
+                isLocal = isLocal
+            )
+        }
         updatePlaybackState()
         updateNotification()
     }
 
-    private fun playUri(uri: Uri, title: String?, artist: String?, artworkUrl: String?) {
-        player.setMediaItem(MediaItem.fromUri(uri))
-        player.prepare()
-        player.playWhenReady = true
-        updateMetadata(title, artist, artworkUrl)
-        val dur = runCatching { player.duration }.getOrElse { 0L }
-        val isLocal = uri.scheme == "file"
-        PlaybackStateHolder.update(
-            title = title,
-            artist = artist,
-            artworkUrl = artworkUrl,
-            durationMs = if (dur > 0) dur else PlaybackStateHolder.uiState.value.durationMs,
-            currentUrl = uri.toString(),
-            isLocal = isLocal
-        )
-        updatePlaybackState()
-        updateNotification()
-    }
+    
 
     @Suppress("UNUSED_PARAMETER")
     private fun updateMetadata(title: String?, artist: String?, artworkUrl: String?) {
@@ -167,8 +177,52 @@ class DhoonHubService : Service() {
 
     private fun pause() { player.pause(); updatePlaybackState(); updateNotification(); PlaybackStateHolder.update(isPlaying = false) }
     private fun play() { player.play(); updatePlaybackState(); updateNotification(); PlaybackStateHolder.update(isPlaying = true) }
-    private fun next() { player.seekToNextMediaItem(); updatePlaybackState(); updateNotification() }
-    private fun previous() { player.seekToPreviousMediaItem(); updatePlaybackState(); updateNotification() }
+    private fun next() {
+        if (player.hasNextMediaItem()) {
+            player.seekToNextMediaItem()
+            currentPlaylistIndex = player.currentMediaItemIndex
+            updateCurrentSongInfo()
+        } else if (currentPlaylist.isNotEmpty()) {
+            // Loop back to the first song if at the end of the playlist
+            player.seekToDefaultPosition(0)
+            currentPlaylistIndex = 0
+            updateCurrentSongInfo()
+        }
+        updatePlaybackState()
+        updateNotification()
+    }
+
+    private fun previous() {
+        if (player.hasPreviousMediaItem()) {
+            player.seekToPreviousMediaItem()
+            currentPlaylistIndex = player.currentMediaItemIndex
+            updateCurrentSongInfo()
+        } else if (currentPlaylist.isNotEmpty()) {
+            // Loop back to the last song if at the beginning of the playlist
+            player.seekToDefaultPosition(currentPlaylist.size - 1)
+            currentPlaylistIndex = currentPlaylist.size - 1
+            updateCurrentSongInfo()
+        }
+        updatePlaybackState()
+        updateNotification()
+    }
+
+    private fun updateCurrentSongInfo() {
+        val currentSong = currentPlaylist.getOrNull(currentPlaylistIndex)
+        if (currentSong != null) {
+            updateMetadata(currentSong.title, currentSong.artist, currentSong.thumbnail)
+            val dur = runCatching { player.duration }.getOrElse { 0L }
+            val isLocal = currentSong.url.startsWith("file")
+            PlaybackStateHolder.update(
+                title = currentSong.title,
+                artist = currentSong.artist,
+                artworkUrl = currentSong.thumbnail,
+                durationMs = if (dur > 0) dur else PlaybackStateHolder.uiState.value.durationMs,
+                currentUrl = currentSong.url,
+                isLocal = isLocal
+            )
+        }
+    }
 
     private fun updatePlaybackState() {
         val state = if (player.isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
@@ -291,13 +345,14 @@ class DhoonHubService : Service() {
         const val EXTRA_ARTWORK = "extra_artwork"
         const val EXTRA_POSITION_MS = "extra_position_ms"
 
-        fun startPlayUrl(context: Context, url: String, title: String? = null, artist: String? = null, artworkUrl: String? = null) {
+        const val EXTRA_PLAYLIST = "extra_playlist"
+        const val EXTRA_START_INDEX = "extra_start_index"
+
+        fun startPlayUrl(context: Context, songs: List<Song>, startIndex: Int = 0) {
             val intent = Intent(context, DhoonHubService::class.java).apply {
                 action = ACTION_PLAY_URL
-                putExtra(EXTRA_URL, url)
-                putExtra(EXTRA_TITLE, title)
-                putExtra(EXTRA_ARTIST, artist)
-                putExtra(EXTRA_ARTWORK, artworkUrl)
+                putExtra(EXTRA_PLAYLIST, ArrayList(songs))
+                putExtra(EXTRA_START_INDEX, startIndex)
             }
             ContextCompat.startForegroundService(context, intent)
         }

@@ -87,8 +87,9 @@ fun OnlineScreen(rootNav: NavController) {
                         trailingContent = {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 TextButton(onClick = {
-                                    DhoonHubService.startPlayUrl(context, song.url,
-                                        title = song.title, artist = song.artist, artworkUrl = song.thumbnail)
+                                    DhoonHubService.startPlayUrl(context, 
+                                        listOf(song),
+                                        0)
                                     rootNav.navigate("player")
                                 }) { Text("Play") }
                                 val pid = defaultPlaylistId
@@ -130,8 +131,9 @@ fun OnlineScreen(rootNav: NavController) {
                             }
                         },
                         modifier = Modifier.clickable {
-                            DhoonHubService.startPlayUrl(context, song.url,
-                                title = song.title, artist = song.artist, artworkUrl = song.thumbnail)
+                            DhoonHubService.startPlayUrl(context, 
+                                listOf(song),
+                                0)
                             rootNav.navigate("player")
                         }
                     )

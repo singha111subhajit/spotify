@@ -243,10 +243,8 @@ fun PlayerScreen(nav: NavController) {
                                         IconButton(onClick = {
                                             DhoonHubService.startPlayUrl(
                                                 context,
-                                                song.url,
-                                                title = song.title,
-                                                artist = song.artist,
-                                                artworkUrl = song.thumbnail
+                                                listOf(song),
+                                                0
                                             )
                                         }) {
                                             Icon(
