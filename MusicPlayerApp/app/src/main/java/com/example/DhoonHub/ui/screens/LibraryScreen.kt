@@ -134,7 +134,7 @@ fun LibraryScreen(
                 isSearching = true
                 try {
                     currentPage = 1
-                    val first = repo.searchSongsOnline("top", page = currentPage, perPage = 20)
+                    val first = repo.searchSongsOnline("Hindi", page = currentPage, perPage = 20)
                     onlineSongs = first
                     canLoadMore = first.isNotEmpty()
                 } catch (e: Exception) {
@@ -451,7 +451,7 @@ fun OnlineTab(
                     value = searchQuery,
                     onValueChange = { onSearchQueryChange(it) },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("Search songs, artists, albums…") },
+                    placeholder = { Text("Search…") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
                     singleLine = true
                 )
