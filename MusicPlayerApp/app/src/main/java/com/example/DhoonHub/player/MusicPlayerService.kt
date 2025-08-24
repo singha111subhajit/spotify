@@ -104,14 +104,24 @@ class DhoonHubService : Service() {
             MediaButtonReceiver.handleIntent(mediaSession, intent)
             when (intent?.action) {
                 ACTION_PLAY_URL -> {
-                    val playlist = intent.getParcelableArrayListExtra(EXTRA_PLAYLIST, Song::class.java)
+                    val playlist = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableArrayListExtra(EXTRA_PLAYLIST, Song::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableArrayListExtra(EXTRA_PLAYLIST)
+                    }
                     val startIndex = intent.getIntExtra(EXTRA_START_INDEX, 0)
                     if (!playlist.isNullOrEmpty()) {
-                        setPlaylistAndPlay(playlist, startIndex)
+                        setPlaylistAndPlay(playlist as ArrayList<Song>, startIndex)
                     }
                 }
                 ACTION_PLAY_FILE -> {
-                    val song = intent.getParcelableExtra(EXTRA_SONG, Song::class.java)
+                    val song = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(EXTRA_SONG, Song::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra(EXTRA_SONG)
+                    }
                     Log.d(TAG, "Received song: $song")
                     if (song != null) {
                         val offlineSongs = repo.getOfflineSongsWithMetadata()
@@ -124,12 +134,14 @@ class DhoonHubService : Service() {
                 ACTION_PREVIOUS -> previous()
                 ACTION_TOGGLE_SHUFFLE -> {
                     player.shuffleModeEnabled = !player.shuffleModeEnabled
+                    PlaybackStateHolder.update(isShuffle = player.shuffleModeEnabled)
                     updateNotification()
                 }
                 ACTION_TOGGLE_REPEAT -> {
                     player.repeatMode =
                         if (player.repeatMode == Player.REPEAT_MODE_OFF) Player.REPEAT_MODE_ALL
                         else Player.REPEAT_MODE_OFF
+                    PlaybackStateHolder.update(isRepeat = player.repeatMode != Player.REPEAT_MODE_OFF)
                     updateNotification()
                 }
                 ACTION_SEEK_TO -> {

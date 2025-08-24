@@ -11,9 +11,17 @@ data class Song(
     val url: String,
     val thumbnail: String? = null,
     val album: String? = null
-): Parcelable
+): Parcelable {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
 
-data class Playlist(
-    val id: Int,
-    val name: String
-)
+        other as Song
+
+        return id == other.id
+    }
+
+    override fun hashCode(): Int {
+        return id?.hashCode() ?: 0
+    }
+}

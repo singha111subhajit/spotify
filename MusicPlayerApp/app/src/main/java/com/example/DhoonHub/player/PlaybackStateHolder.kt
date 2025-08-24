@@ -14,7 +14,9 @@ data class PlaybackUiState(
     val artist: String = "",
     val artworkUrl: String? = null,
     val currentUrl: String? = null,
-    val isLocal: Boolean = false
+    val isLocal: Boolean = false,
+    val isShuffle: Boolean = false,
+    val isRepeat: Boolean = false
 )
 
 object PlaybackStateHolder {
@@ -29,7 +31,9 @@ object PlaybackStateHolder {
         artist: String? = null,
         artworkUrl: String? = null,
         currentUrl: String? = null,
-        isLocal: Boolean? = null
+        isLocal: Boolean? = null,
+        isShuffle: Boolean? = null,
+        isRepeat: Boolean? = null
     ) {
         val cur = _uiState.value
         _uiState.value = cur.copy(
@@ -41,6 +45,8 @@ object PlaybackStateHolder {
             artworkUrl = artworkUrl ?: cur.artworkUrl,
             currentUrl = currentUrl ?: cur.currentUrl,
             isLocal = isLocal ?: cur.isLocal,
+            isShuffle = isShuffle ?: cur.isShuffle,
+            isRepeat = isRepeat ?: cur.isRepeat
         )
     }
 
