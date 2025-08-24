@@ -27,22 +27,19 @@ import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import com.example.DhoonHub.model.Song
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 
 class DhoonHubService : Service() {
     private lateinit var player: ExoPlayer
     private lateinit var mediaSession: MediaSessionCompat
     private var tickerJob: Job? = null
-    private var currentPlaylist: List<com.example.DhoonHub.model.Song> = emptyList()
+    private var currentPlaylist: List<Song> = emptyList()
     private var currentPlaylistIndex: Int = -1
 
     override fun onCreate() {
         super.onCreate()
+
+        // Build ExoPlayer with proper audio attributes
         player = ExoPlayer.Builder(this).build().apply {
             val audioAttr = AudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA)
@@ -50,41 +47,54 @@ class DhoonHubService : Service() {
                 .build()
             setAudioAttributes(audioAttr, true)
         }
+
+        // Setup MediaSession for integration with Android system
         mediaSession = MediaSessionCompat(this, "DhoonHubService").apply {
             isActive = true
             setCallback(object : MediaSessionCompat.Callback() {
-                override fun onPlay() { play() }
-                override fun onPause() { pause() }
-                override fun onSkipToNext() { next() }
-                override fun onSkipToPrevious() { previous() }
-                override fun onStop() { stopSelf() }
+                override fun onPlay() = play()
+                override fun onPause() = pause()
+                override fun onSkipToNext() = next()
+                override fun onSkipToPrevious() = previous()
+                override fun onStop() = stopSelf()
             })
         }
+
+        // Player listeners
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 PlaybackStateHolder.update(isPlaying = isPlaying)
                 if (isPlaying) startTicker() else stopTicker()
             }
+
             override fun onPlayerError(error: PlaybackException) {
-                Log.e(TAG, "ExoPlayer error: ${'$'}{error.errorCodeName}", error)
+                Log.e(TAG, "ExoPlayer error: ${error.errorCodeName}", error)
             }
+
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_READY) {
                     val dur = runCatching { player.duration }.getOrElse { 0L }
                     if (dur > 0) PlaybackStateHolder.update(durationMs = dur)
-                } else if (playbackState == Player.STATE_ENDED) {
-                    // Automatically play next song when current one ends
-                    next()
                 }
             }
+
+            // 🔑 This is the important fix
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                currentPlaylistIndex = player.currentMediaItemIndex
+                val song = currentPlaylist.getOrNull(currentPlaylistIndex)
+                if (song != null) {
+                    updateCurrentSongInfo(song)
+                }
+                updatePlaybackState()
+                updateNotification()
+            }
         })
+
         createNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Start foreground immediately to comply with restrictions
         startForeground(NOTIFICATION_ID, buildNotification())
-        @Suppress("DEPRECATION", "UNCHECKED_CAST")
         return try {
             MediaButtonReceiver.handleIntent(mediaSession, intent)
             when (intent?.action) {
@@ -110,7 +120,9 @@ class DhoonHubService : Service() {
                     updateNotification()
                 }
                 ACTION_TOGGLE_REPEAT -> {
-                    player.repeatMode = if (player.repeatMode == Player.REPEAT_MODE_OFF) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
+                    player.repeatMode =
+                        if (player.repeatMode == Player.REPEAT_MODE_OFF) Player.REPEAT_MODE_ALL
+                        else Player.REPEAT_MODE_OFF
                     updateNotification()
                 }
                 ACTION_SEEK_TO -> {
@@ -148,98 +160,91 @@ class DhoonHubService : Service() {
 
         val currentSong = songs.getOrNull(startIndex)
         if (currentSong != null) {
-            updateMetadata(currentSong.title, currentSong.artist, currentSong.thumbnail)
-            val dur = runCatching { player.duration }.getOrElse { 0L }
-            val isLocal = currentSong.url.startsWith("file")
-            PlaybackStateHolder.update(
-                title = currentSong.title,
-                artist = currentSong.artist,
-                artworkUrl = currentSong.thumbnail,
-                durationMs = if (dur > 0) dur else PlaybackStateHolder.uiState.value.durationMs,
-                currentUrl = currentSong.url,
-                isLocal = isLocal
-            )
+            updateCurrentSongInfo(currentSong)
         }
         updatePlaybackState()
         updateNotification()
     }
 
-    
-
-    @Suppress("UNUSED_PARAMETER")
     private fun updateMetadata(title: String?, artist: String?, artworkUrl: String?) {
         val builder = MediaMetadataCompat.Builder()
             .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title ?: "")
             .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist ?: "")
-        // Avoid network on main thread; rely on notification/clients to show artwork
         mediaSession.setMetadata(builder.build())
     }
 
-    private fun pause() { player.pause(); updatePlaybackState(); updateNotification(); PlaybackStateHolder.update(isPlaying = false) }
-    private fun play() { player.play(); updatePlaybackState(); updateNotification(); PlaybackStateHolder.update(isPlaying = true) }
+    private fun pause() {
+        player.pause()
+        updatePlaybackState()
+        updateNotification()
+        PlaybackStateHolder.update(isPlaying = false)
+    }
+
+    private fun play() {
+        player.play()
+        updatePlaybackState()
+        updateNotification()
+        PlaybackStateHolder.update(isPlaying = true)
+    }
+
     private fun next() {
         if (player.hasNextMediaItem()) {
             player.seekToNextMediaItem()
-            currentPlaylistIndex = player.currentMediaItemIndex
-            updateCurrentSongInfo()
         } else if (currentPlaylist.isNotEmpty()) {
-            // Loop back to the first song if at the end of the playlist
-            player.seekToDefaultPosition(0)
-            currentPlaylistIndex = 0
-            updateCurrentSongInfo()
+            player.seekToDefaultPosition(0) // loop back
         }
-        updatePlaybackState()
-        updateNotification()
     }
 
     private fun previous() {
         if (player.hasPreviousMediaItem()) {
             player.seekToPreviousMediaItem()
-            currentPlaylistIndex = player.currentMediaItemIndex
-            updateCurrentSongInfo()
         } else if (currentPlaylist.isNotEmpty()) {
-            // Loop back to the last song if at the beginning of the playlist
-            player.seekToDefaultPosition(currentPlaylist.size - 1)
-            currentPlaylistIndex = currentPlaylist.size - 1
-            updateCurrentSongInfo()
+            player.seekToDefaultPosition(currentPlaylist.size - 1) // loop back
         }
-        updatePlaybackState()
-        updateNotification()
     }
 
-    private fun updateCurrentSongInfo() {
-        val currentSong = currentPlaylist.getOrNull(currentPlaylistIndex)
-        if (currentSong != null) {
-            updateMetadata(currentSong.title, currentSong.artist, currentSong.thumbnail)
-            val dur = runCatching { player.duration }.getOrElse { 0L }
-            val isLocal = currentSong.url.startsWith("file")
-            PlaybackStateHolder.update(
-                title = currentSong.title,
-                artist = currentSong.artist,
-                artworkUrl = currentSong.thumbnail,
-                durationMs = if (dur > 0) dur else PlaybackStateHolder.uiState.value.durationMs,
-                currentUrl = currentSong.url,
-                isLocal = isLocal
-            )
-        }
+    private fun updateCurrentSongInfo(song: Song) {
+        updateMetadata(song.title, song.artist, song.thumbnail)
+        val dur = runCatching { player.duration }.getOrElse { 0L }
+        val isLocal = song.url.startsWith("file")
+        PlaybackStateHolder.update(
+            title = song.title,
+            artist = song.artist,
+            artworkUrl = song.thumbnail,
+            durationMs = if (dur > 0) dur else PlaybackStateHolder.uiState.value.durationMs,
+            currentUrl = song.url,
+            isLocal = isLocal
+        )
     }
 
     private fun updatePlaybackState() {
-        val state = if (player.isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
+        val state =
+            if (player.isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
         mediaSession.setPlaybackState(
             PlaybackStateCompat.Builder()
                 .setActions(
                     PlaybackStateCompat.ACTION_PLAY or
-                        PlaybackStateCompat.ACTION_PAUSE or
-                        PlaybackStateCompat.ACTION_PLAY_PAUSE or
-                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+                            PlaybackStateCompat.ACTION_PAUSE or
+                            PlaybackStateCompat.ACTION_PLAY_PAUSE or
+                            PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                            PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
                 )
                 .setState(state, player.currentPosition, 1.0f)
                 .build()
         )
         val dur = runCatching { player.duration }.getOrElse { PlaybackStateHolder.uiState.value.durationMs }
-        PlaybackStateHolder.update(positionMs = player.currentPosition, durationMs = if (dur > 0) dur else PlaybackStateHolder.uiState.value.durationMs)
+        val currentSong = currentPlaylist.getOrNull(currentPlaylistIndex)
+
+        PlaybackStateHolder.update(
+            isPlaying = player.isPlaying,
+            positionMs = player.currentPosition,
+            durationMs = if (dur > 0) dur else PlaybackStateHolder.uiState.value.durationMs,
+            title = currentSong?.title,
+            artist = currentSong?.artist,
+            artworkUrl = currentSong?.thumbnail,
+            currentUrl = currentSong?.url,
+            isLocal = currentSong?.url?.startsWith("file")
+        )
     }
 
     private fun buildNotification(): Notification {
@@ -260,7 +265,10 @@ class DhoonHubService : Service() {
                 NotificationCompat.Action(
                     R.drawable.ic_launcher_foreground,
                     getString(R.string.previous),
-                    MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS)
+                    MediaButtonReceiver.buildMediaButtonPendingIntent(
+                        this,
+                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+                    )
                 )
             )
             .addAction(
@@ -277,7 +285,10 @@ class DhoonHubService : Service() {
                 NotificationCompat.Action(
                     R.drawable.ic_launcher_foreground,
                     getString(R.string.next),
-                    MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_SKIP_TO_NEXT)
+                    MediaButtonReceiver.buildMediaButtonPendingIntent(
+                        this,
+                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+                    )
                 )
             )
         return builder.build()
@@ -307,7 +318,8 @@ class DhoonHubService : Service() {
             while (isActive) {
                 try {
                     val pos = runCatching { player.currentPosition }.getOrElse { 0L }
-                    val dur = runCatching { player.duration }.getOrElse { PlaybackStateHolder.uiState.value.durationMs }
+                    val dur = runCatching { player.duration }
+                        .getOrElse { PlaybackStateHolder.uiState.value.durationMs }
                     val safeDur = if (dur > 0) dur else PlaybackStateHolder.uiState.value.durationMs
                     PlaybackStateHolder.update(positionMs = pos.coerceAtLeast(0L), durationMs = safeDur)
                 } catch (e: Exception) {
