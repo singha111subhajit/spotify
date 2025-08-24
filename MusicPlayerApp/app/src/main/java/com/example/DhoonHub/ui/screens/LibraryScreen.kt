@@ -61,25 +61,8 @@ fun LibraryScreen(
     // Function to refresh offline songs and downloaded state
     fun refreshOfflineSongs() {
         coroutineScope.launch {
-            val offlineFiles = repo.getOfflineSongs()
-            offlineSongs = offlineFiles.map { file ->
-                // Parse filename to extract song info
-                val filename = file.nameWithoutExtension
-                val parts = filename.split("-")
-                val artist = if (parts.size > 1) parts[0] else "Unknown Artist"
-                val title = if (parts.size > 2) parts[1] else filename
-                Song(
-                    id = file.absolutePath,
-                    title = title,
-                    artist = artist,
-                    url = file.absolutePath,
-                    thumbnail = null,
-                    // Add other properties as needed
-                )
-            }
-            
-            // Update the set of downloaded song IDs
-            downloadedSongIds = offlineFiles.map { it.nameWithoutExtension }.toSet()
+            offlineSongs = repo.getOfflineSongsWithMetadata()
+            downloadedSongIds = offlineSongs.mapNotNull { it.id }.toSet()
         }
     }
     
@@ -192,7 +175,7 @@ fun LibraryScreen(
                 0 -> OfflineTab(
                     songs = offlineSongs,
                     onSongClick = { song ->
-                        DhoonHubService.startPlayFile(context, song.url)
+                        DhoonHubService.startPlayFile(context, song)
                         rootNav.navigate("player")
                     },
                     onDeleteSong = { song ->
@@ -622,7 +605,13 @@ fun OfflineSongItem(song: Song, onClick: () -> Unit, onDelete: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                EmbeddedArtImage(filePath = song.url, size = 56.dp)
+                AsyncImage(
+                    model = song.thumbnail,
+                    contentDescription = song.title,
+                    modifier = Modifier.size(56.dp),
+                    placeholder = painterResource(R.drawable.ic_launcher_foreground),
+                    error = painterResource(R.drawable.ic_launcher_foreground)
+                )
                 val meta by rememberOfflineMetadata(song.url)
                 Column(
                     Modifier.weight(1f),
@@ -687,7 +676,7 @@ private fun EmbeddedArtImage(filePath: String, size: Dp) {
         )
     } else {
         Icon(
-            painter = painterResource(R.drawable.ic_music_note),
+            painter = painterResource(R.drawable.ic_launcher_foreground),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(size)

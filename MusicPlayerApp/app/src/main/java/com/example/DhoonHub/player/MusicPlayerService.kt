@@ -10,6 +10,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
+import android.os.Parcelable
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -27,7 +28,9 @@ import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import com.example.DhoonHub.model.Song
+import com.example.DhoonHub.repository.MusicRepository
 import kotlinx.coroutines.*
+import java.io.File
 
 class DhoonHubService : Service() {
     private lateinit var player: ExoPlayer
@@ -35,9 +38,11 @@ class DhoonHubService : Service() {
     private var tickerJob: Job? = null
     private var currentPlaylist: List<Song> = emptyList()
     private var currentPlaylistIndex: Int = -1
+    private lateinit var repo: MusicRepository
 
     override fun onCreate() {
         super.onCreate()
+        repo = MusicRepository(applicationContext)
 
         // Build ExoPlayer with proper audio attributes
         player = ExoPlayer.Builder(this).build().apply {
@@ -99,17 +104,19 @@ class DhoonHubService : Service() {
             MediaButtonReceiver.handleIntent(mediaSession, intent)
             when (intent?.action) {
                 ACTION_PLAY_URL -> {
-                    val playlist = intent.getSerializableExtra(EXTRA_PLAYLIST) as? ArrayList<Song>
+                    val playlist = intent.getParcelableArrayListExtra(EXTRA_PLAYLIST, Song::class.java)
                     val startIndex = intent.getIntExtra(EXTRA_START_INDEX, 0)
                     if (!playlist.isNullOrEmpty()) {
                         setPlaylistAndPlay(playlist, startIndex)
                     }
                 }
                 ACTION_PLAY_FILE -> {
-                    val path = intent.getStringExtra(EXTRA_FILE_PATH)
-                    if (!path.isNullOrBlank()) {
-                        val song = Song(id = path, title = "Local File", artist = "", url = path, thumbnail = null)
-                        setPlaylistAndPlay(listOf(song), 0)
+                    val song = intent.getParcelableExtra(EXTRA_SONG, Song::class.java)
+                    Log.d(TAG, "Received song: $song")
+                    if (song != null) {
+                        val offlineSongs = repo.getOfflineSongsWithMetadata()
+                        val startIndex = offlineSongs.indexOf(song)
+                        setPlaylistAndPlay(offlineSongs, if (startIndex != -1) startIndex else 0)
                     }
                 }
                 ACTION_TOGGLE_PLAY_PAUSE -> if (player.isPlaying) pause() else play()
@@ -153,7 +160,13 @@ class DhoonHubService : Service() {
         currentPlaylist = songs
         currentPlaylistIndex = startIndex
 
-        val mediaItems = songs.map { MediaItem.fromUri(Uri.parse(it.url)) }
+        val mediaItems = songs.map { 
+            if (it.url.startsWith("http")) {
+                MediaItem.fromUri(Uri.parse(it.url))
+            } else {
+                MediaItem.fromUri(Uri.fromFile(File(it.url)))
+            }
+        }
         player.setMediaItems(mediaItems, startIndex, 0L)
         player.prepare()
         player.playWhenReady = true
@@ -351,6 +364,7 @@ class DhoonHubService : Service() {
         const val ACTION_SEEK_TO = "com.example.DhoonHub.action.SEEK_TO"
 
         const val EXTRA_URL = "extra_url"
+        const val EXTRA_SONG = "extra_song"
         const val EXTRA_FILE_PATH = "extra_file_path"
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_ARTIST = "extra_artist"
@@ -363,16 +377,16 @@ class DhoonHubService : Service() {
         fun startPlayUrl(context: Context, songs: List<Song>, startIndex: Int = 0) {
             val intent = Intent(context, DhoonHubService::class.java).apply {
                 action = ACTION_PLAY_URL
-                putExtra(EXTRA_PLAYLIST, ArrayList(songs))
+                putParcelableArrayListExtra(EXTRA_PLAYLIST, ArrayList(songs))
                 putExtra(EXTRA_START_INDEX, startIndex)
             }
             ContextCompat.startForegroundService(context, intent)
         }
 
-        fun startPlayFile(context: Context, path: String) {
+        fun startPlayFile(context: Context, song: Song) {
             val intent = Intent(context, DhoonHubService::class.java).apply {
                 action = ACTION_PLAY_FILE
-                putExtra(EXTRA_FILE_PATH, path)
+                putExtra(EXTRA_SONG, song)
             }
             ContextCompat.startForegroundService(context, intent)
         }
