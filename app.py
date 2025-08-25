@@ -15,6 +15,11 @@ from functools import wraps
 from flask_migrate import Migrate
 
 
+# Add these imports at the top of your file
+
+import time
+from threading import Lock
+
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
 
@@ -1165,10 +1170,33 @@ def fetch_album_songs(album_id: str):
         print(f"Error fetching album {album_id}: {e}")
         return None
 
+# Add these global variables after your existing configuration
+ALBUMS_CACHE = {
+    'data': None,
+    'timestamp': 0,
+    'lock': Lock()
+}
+# Add this near your other configuration variables
+
+# Cache configuration - can be overridden by environment variables
+ALBUMS_CACHE_TTL = int(os.environ.get('ALBUMS_CACHE_TTL', 3600))  # Default 1 hour
+
+# Replace your existing api_albums function with this cached version
 @app.route('/api/albums')
 def api_albums():
-    """Get list of albums with all their songs (from JioSaavn)."""
+    """Get list of albums with all their songs (from JioSaavn) - with caching."""
     try:
+        current_time = time.time()
+        
+        # Check if we have valid cached data
+        with ALBUMS_CACHE['lock']:
+            if (ALBUMS_CACHE['data'] is not None and 
+                current_time - ALBUMS_CACHE['timestamp'] < ALBUMS_CACHE_TTL):
+                print("Serving albums from cache")
+                return jsonify(ALBUMS_CACHE['data'])
+        
+        print("Cache miss or expired, fetching fresh albums data...")
+        
         # --- read queries from frontend ---
         queries_param = request.args.get("queries", "Hindi")
         queries = [q.strip() for q in queries_param.split(",") if q.strip()] or ["top"]
@@ -1227,44 +1255,61 @@ def api_albums():
             album['song_count'] = len(album['songs'])
             album_list.append(album)
 
-        return jsonify({
+        response_data = {
             'albums': album_list,
-            'total': len(album_list)
-        })
+            'total': len(album_list),
+            'cached': False,
+            'cache_timestamp': current_time
+        }
+
+        # Update cache with new data
+        with ALBUMS_CACHE['lock']:
+            ALBUMS_CACHE['data'] = response_data
+            ALBUMS_CACHE['timestamp'] = current_time
+            print(f"Albums cache updated with {len(album_list)} albums")
+
+        return jsonify(response_data)
+        
     except Exception as e:
         print(f"Error getting albums: {e}")
         return jsonify({'error': 'Failed to get albums'}), 500
 
-@app.route('/api/album_songs')
-def api_album_songs():
-    """Get full song list for a single album (lazy load)."""
+# Add a cache management endpoint for debugging/admin purposes
+@app.route('/api/cache/albums/clear')
+def clear_albums_cache():
+    """Clear the albums cache (for debugging/admin)"""
     try:
-        album_name = request.args.get("album")
-        if not album_name:
-            return jsonify({'error': 'Album name required'}), 400
-
-        # Fetch album songs from JioSaavn
-        album_songs, _ = search_jiosaavn(album_name, page=1, per_page=50)
-
-        # Upgrade URLs if available
-        for s in album_songs:
-            if s.get('url'):
-                s['url'] = upgrade_url(s['url'])
-            if s.get('thumbnail'):
-                s['thumbnail'] = upgrade_url(s['thumbnail'])
-
-        # Prepare response
+        with ALBUMS_CACHE['lock']:
+            ALBUMS_CACHE['data'] = None
+            ALBUMS_CACHE['timestamp'] = 0
         return jsonify({
-            'album': album_name,
-            'songs': album_songs,
-            'song_count': len(album_songs),
-            'duration': sum(int(s.get('duration', 0)) for s in album_songs if s.get('duration'))
+            'message': 'Albums cache cleared successfully',
+            'status': 'success'
         })
-
     except Exception as e:
-        print(f"Error fetching songs for album {album_name}: {e}")
-        return jsonify({'error': 'Failed to get album songs'}), 500
+        return jsonify({'error': 'Failed to clear cache'}), 500
 
+@app.route('/api/cache/albums/status')
+def albums_cache_status():
+    """Get albums cache status (for debugging/admin)"""
+    try:
+        current_time = time.time()
+        with ALBUMS_CACHE['lock']:
+            cache_age = current_time - ALBUMS_CACHE['timestamp'] if ALBUMS_CACHE['timestamp'] > 0 else None
+            is_valid = (ALBUMS_CACHE['data'] is not None and 
+                       cache_age is not None and 
+                       cache_age < ALBUMS_CACHE_TTL)
+            
+        return jsonify({
+            'cache_exists': ALBUMS_CACHE['data'] is not None,
+            'cache_age_seconds': cache_age,
+            'cache_ttl_seconds': ALBUMS_CACHE_TTL,
+            'is_valid': is_valid,
+            'albums_count': len(ALBUMS_CACHE['data']['albums']) if ALBUMS_CACHE['data'] else 0,
+            'last_updated': ALBUMS_CACHE['timestamp'] if ALBUMS_CACHE['timestamp'] > 0 else None
+        })
+    except Exception as e:
+        return jsonify({'error': 'Failed to get cache status'}), 500
 
 
 @app.route('/api/stats')
