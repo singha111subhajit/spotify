@@ -1,3 +1,4 @@
+
 package com.example.DhoonHub.ui
 
 import androidx.compose.foundation.layout.Box
@@ -67,7 +68,6 @@ fun MainScaffold(
     val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
 
-    val authRepo = remember { AuthRepository(context) }
     val settings = remember { SettingsStorage.getInstance(context) }
 
     val languages = listOf("English", "Hindi", "Bengali", "Punjabi", "Tamil", "Telugu")
@@ -79,7 +79,7 @@ fun MainScaffold(
         drawerContent = {
             ModalDrawerSheet {
                 Text("DhoonHub Menu", modifier = Modifier.padding(16.dp))
-                Divider()
+                HorizontalDivider()
                 // Removed Home NavigationDrawerItem
                 // Removed Logout NavigationDrawerItem
             }

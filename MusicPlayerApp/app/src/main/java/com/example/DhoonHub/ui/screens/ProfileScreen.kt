@@ -20,40 +20,110 @@ fun ProfileScreen(rootNav: NavController) {
     val context = LocalContext.current
     val authRepo = remember { AuthRepository(context) }
     val settings = remember { SettingsStorage.getInstance(context) }
-    
-    // Use a default username
-    var username by remember { mutableStateOf("User") }
-    
-    // Try to get user information when the screen loads
-    LaunchedEffect(Unit) {
-        // Since we don't have a getUserId method, we'll just use a default value
-        // In a real app, you might want to store the username during login/registration
-        // and retrieve it here from SharedPreferences or another storage mechanism
-    }
-    
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Profile avatar
-        Icon(
-            imageVector = Icons.Default.AccountCircle,
-            contentDescription = "Profile Picture",
-            modifier = Modifier.size(120.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Username
-        Text(
-            text = username,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-        
-        Spacer(modifier = Modifier.height(32.dp))
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Profile") },
+                actions = {
+                    TextButton(
+                        onClick = {
+                            authRepo.logout()
+                            rootNav.navigate("login") {
+                                popUpTo("main") { inclusive = true }
+                            }
+                        }
+                    ) {
+                        Text("Logout")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Profile header
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.AccountCircle,
+                        contentDescription = "Profile",
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text = "DhoonHub User",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Music Lover",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            // Settings card
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "Settings",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Current Language: ${settings.getLanguage()}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+            
+            // Account card
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "Account",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            authRepo.logout()
+                            rootNav.navigate("login") {
+                                popUpTo("main") { inclusive = true }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Logout")
+                    }
+                }
+            }
+        }
     }
 }

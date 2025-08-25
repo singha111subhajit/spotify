@@ -191,8 +191,13 @@ class DhoonHubService : Service() {
             currentUrl = null
         )
         
-        // Stop foreground service
-        stopForeground(true)
+        // Fix deprecated stopForeground
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -241,11 +246,12 @@ class DhoonHubService : Service() {
         updateNotification()
     }
 
-    private fun updateMetadata(title: String?, artist: String?, artworkUrl: String?) {
-        val builder = MediaMetadataCompat.Builder()
-            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title ?: "")
-            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist ?: "")
-        mediaSession.setMetadata(builder.build())
+    private fun updateMetadata(title: String?, artist: String?) {
+        val metadata = MediaMetadataCompat.Builder()
+            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title ?: "Unknown")
+            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist ?: "Unknown")
+            .build()
+        mediaSession.setMetadata(metadata)
     }
 
     private fun pause() {
@@ -279,7 +285,7 @@ class DhoonHubService : Service() {
     }
 
     private fun updateCurrentSongInfo(song: Song) {
-        updateMetadata(song.title, song.artist, song.thumbnail)
+        updateMetadata(song.title, song.artist)
         val dur = runCatching { player.duration }.getOrElse { 0L }
         val isLocal = song.url.startsWith("file")
         PlaybackStateHolder.update(
