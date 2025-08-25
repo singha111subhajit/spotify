@@ -1,4 +1,3 @@
-
 package com.example.DhoonHub.ui.components
 
 import androidx.compose.animation.core.*
@@ -24,6 +23,13 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.toSize
+import com.example.DhoonHub.network.api.Album
+import com.example.DhoonHub.model.Song
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.clickable
+import com.example.DhoonHub.R
 
 @Composable
 fun LoadingScreen(
@@ -246,5 +252,71 @@ fun LoadingButton(
             Spacer(modifier = Modifier.width(8.dp))
         }
         content()
+    }
+}
+
+@Composable
+fun AlbumCard(album: Album, onClick: () -> Unit) {
+    ElevatedCard(
+        Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    ) {
+        Column(
+            Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            AsyncImage(
+                model = album.songs.firstOrNull()?.thumbnail,
+                contentDescription = album.name,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
+                placeholder = painterResource(R.drawable.ic_music_note),
+                error = painterResource(R.drawable.ic_music_note),
+                contentScale = ContentScale.Crop
+            )
+            Text(album.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+            Text(
+                album.artist,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+fun SongSearchCard(song: Song, onClick: () -> Unit) {
+    ElevatedCard(
+        Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    ) {
+        Column(
+            Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            AsyncImage(
+                model = song.thumbnail,
+                contentDescription = song.title,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
+                placeholder = painterResource(R.drawable.ic_music_note),
+                error = painterResource(R.drawable.ic_music_note),
+                contentScale = ContentScale.Crop
+            )
+            Text(song.title, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+            Text(
+                song.artist,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+        }
     }
 }

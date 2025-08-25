@@ -289,6 +289,15 @@ class MusicViewModel(private val context: Context) : ViewModel() {
         albumSearchResults = emptyList()
     }
     
+    suspend fun clearAlbumsCache(): String {
+        return try {
+            val response = musicApi.clearAlbumsCache()
+            response.message
+        } catch (e: Exception) {
+            "Failed to clear cache: ${e.message}"
+        }
+    }
+    
     // Factory to create the ViewModel with context
     class Factory(private val context: Context) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")

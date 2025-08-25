@@ -27,6 +27,8 @@ data class PlaylistSong(val id: Int, val song_id: String, val song_title: String
 data class PlaylistSongsResponse(val songs: List<PlaylistSong>)
 data class AddSongRequest(val song_id: String, val song_title: String)
 
+data class ClearCacheResponse(val message: String, val status: String)
+
 interface MusicApi {
     @GET("api/songs")
     suspend fun getSongs(): SongsResponse
@@ -61,4 +63,7 @@ interface MusicApi {
 
     @GET("api/album_songs")
     suspend fun getAlbumSongs(@Query("album") album: String): SongsResponse
+
+    @GET("api/cache/albums/clear")
+    suspend fun clearAlbumsCache(): ClearCacheResponse
 }

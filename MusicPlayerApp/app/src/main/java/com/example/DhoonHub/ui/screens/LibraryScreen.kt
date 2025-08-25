@@ -110,9 +110,9 @@ fun LibraryScreen(
     LaunchedEffect(currentTab, onlineSearchQuery) {
         if (currentTab == 1) {
             error = null
-            // If no query, show a default JioSaavn-driven list using a default query
+            // If no query, show a default DhoonHub-driven list using a default query
             if (onlineSearchQuery.isBlank()) {
-                // Kickstart with a default query to fetch JioSaavn songs
+                // Kickstart with a default query to fetch DhoonHub songs
                 isLoading = onlineSongs.isEmpty()
                 isSearching = true
                 try {
@@ -414,7 +414,7 @@ fun OnlineTab(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    "Search for songs to get results from JioSaavn",
+                    "Search for songs to get results from DhoonHub",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
