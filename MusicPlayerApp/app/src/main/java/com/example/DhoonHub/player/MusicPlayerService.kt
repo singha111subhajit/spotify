@@ -1,3 +1,4 @@
+
 package com.example.DhoonHub.player
 
 import android.app.Notification
@@ -159,22 +160,65 @@ class DhoonHubService : Service() {
                         PlaybackStateHolder.update(positionMs = pos)
                     }
                 }
+                ACTION_STOP -> {
+                    stopSelf()
+                }
             }
-            START_STICKY
+            START_NOT_STICKY
         } catch (e: Exception) {
             Log.e(TAG, "onStartCommand error", e)
-            START_STICKY
+            START_NOT_STICKY
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        Log.d(TAG, "Service being destroyed")
+        
+        // Stop playback
+        player.stop()
+        
+        // Release resources
         mediaSession.release()
         player.release()
         stopTicker()
+        
+        // Clear playback state
+        PlaybackStateHolder.update(
+            isPlaying = false,
+            positionMs = 0L,
+            title = null,
+            artist = null,
+            artworkUrl = null,
+            currentUrl = null
+        )
+        
+        // Stop foreground service
+        stopForeground(true)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Log.d(TAG, "App removed from recent apps, stopping service")
+        
+        // Stop playback
+        player.stop()
+        
+        // Clear playback state
+        PlaybackStateHolder.update(
+            isPlaying = false,
+            positionMs = 0L,
+            title = null,
+            artist = null,
+            artworkUrl = null,
+            currentUrl = null
+        )
+        
+        // Stop the service
+        stopSelf()
+    }
 
     fun setPlaylistAndPlay(songs: List<Song>, startIndex: Int = 0) {
         currentPlaylist = songs
@@ -287,6 +331,15 @@ class DhoonHubService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Add stop action intent
+        val stopIntent = Intent(this, DhoonHubService::class.java).apply {
+            action = ACTION_STOP
+        }
+        val stopPendingIntent = PendingIntent.getService(
+            this, 0, stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(getString(R.string.app_name))
@@ -322,6 +375,13 @@ class DhoonHubService : Service() {
                         this,
                         PlaybackStateCompat.ACTION_SKIP_TO_NEXT
                     )
+                )
+            )
+            .addAction(
+                NotificationCompat.Action(
+                    android.R.drawable.ic_menu_close_clear_cancel,
+                    "Stop",
+                    stopPendingIntent
                 )
             )
         return builder.build()
@@ -382,6 +442,7 @@ class DhoonHubService : Service() {
         const val ACTION_TOGGLE_SHUFFLE = "com.example.DhoonHub.action.TOGGLE_SHUFFLE"
         const val ACTION_TOGGLE_REPEAT = "com.example.DhoonHub.action.TOGGLE_REPEAT"
         const val ACTION_SEEK_TO = "com.example.DhoonHub.action.SEEK_TO"
+        const val ACTION_STOP = "com.example.DhoonHub.action.STOP"
 
         const val EXTRA_URL = "extra_url"
         const val EXTRA_SONG = "extra_song"
