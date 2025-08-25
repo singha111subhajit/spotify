@@ -89,10 +89,8 @@ class DhoonHubService : Service() {
             // 🔑 This is the important fix
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 Log.d(TAG, "Media item transition. Reason: $reason. Repeat mode: ${player.repeatMode}")
-                if (player.repeatMode == Player.REPEAT_MODE_ONE) {
-                    // If repeat one is enabled, don't change the index, just loop the current song
-                    return
-                }
+                // The repeat mode logic is handled by ExoPlayer itself.
+                // When a user explicitly skips, we should update the UI regardless of repeat mode.
                 currentPlaylistIndex = player.currentMediaItemIndex
                 val song = currentPlaylist.getOrNull(currentPlaylistIndex)
                 if (song != null) {
