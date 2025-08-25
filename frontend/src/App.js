@@ -682,36 +682,55 @@ function App() {
     return baseStyle;
   };
 
-  // Add this function after the other handler functions (around line 400-500)
+  // Replace the handleDownloadAndroid function with this improved version:
+  // Replace the handleDownloadAndroid function with this corrected version:
+  
   const handleDownloadAndroid = async () => {
     try {
       setIsLoading(true);
       showToast('Starting download...');
       
-      // Direct download from GitHub releases
-      const directDownloadUrl = "https://github.com/singha111subhajit/dhoonhub-apk/releases/latest/download/app-release.apk";
+      // First try the direct GitHub URL
+      const directUrl = "https://github.com/singha111subhajit/dhoonhub-apk/releases/latest/download/app-release.apk";
       
-      // Create a temporary anchor element for download
+      // Create a temporary link element for download
       const link = document.createElement('a');
-      link.href = directDownloadUrl;
+      link.href = directUrl;
       link.download = 'dhoonhub-app.apk';
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
+      link.style.display = 'none';
       
-      // Append to body, click, and remove
+      // Add to DOM, click, and remove
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
       showToast('Download started! Check your downloads folder.');
+      
+      // Fallback: Try the backend endpoint after a delay
+      setTimeout(async () => {
+        try {
+          const response = await axios.get(`${API_BASE}/api/download/android`);
+          if (response.data && response.data.direct_url) {
+            // If backend provides a different URL, try that too
+            const fallbackLink = document.createElement('a');
+            fallbackLink.href = response.data.direct_url;
+            fallbackLink.download = 'dhoonhub-app.apk';
+            fallbackLink.style.display = 'none';
+            document.body.appendChild(fallbackLink);
+            fallbackLink.click();
+            document.body.removeChild(fallbackLink);
+          }
+        } catch (fallbackError) {
+          console.error('Fallback download failed:', fallbackError);
+          showToast('If download did not start, please visit our GitHub page.');
+        }
+      }, 2000);
+      
     } catch (error) {
       console.error('Download error:', error);
-      showToast('Download failed. Please try again.');
-      
-      // Fallback: open in new tab
-      window.open("https://github.com/singha111subhajit/dhoonhub-apk/releases/latest/download/app-release.apk", '_blank');
+      showToast('Download failed. Please try again or visit GitHub directly.');
     } finally {
-      setTimeout(() => setIsLoading(false), 1000);
+      setIsLoading(false);
     }
   };
 

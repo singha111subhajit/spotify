@@ -1313,23 +1313,18 @@ def download_android_apk():
     try:
         apk_download_url = "https://github.com/singha111subhajit/dhoonhub-apk/releases/latest/download/app-release.apk"
         
-        # Option 1: Direct redirect to the APK download (recommended)
-        return redirect(apk_download_url, code=302)
+        # Set headers to force download
+        response = redirect(apk_download_url, code=302)
+        response.headers['Content-Disposition'] = 'attachment; filename=dhoonhub-app.apk'
+        response.headers['Content-Type'] = 'application/vnd.android.package-archive'
         
-        # # Option 2: If you want to track downloads or provide additional info
-        # return jsonify({
-        #     'download_url': apk_download_url,
-        #     'app_name': 'DhoonHub',
-        #     'platform': 'Android',
-        #     'file_name': 'app-release.apk',
-        #     'instructions': 'Enable "Install from unknown sources" in your Android settings before installing'
-        # })
-        
+        return response
     except Exception as e:
         print(f"Error in download_android_apk: {e}")
         return jsonify({
             'error': 'Failed to get download link',
-            'message': 'Please try again later or visit our GitHub releases page directly'
+            'message': 'Please try again later or visit our GitHub releases page directly',
+            'direct_url': 'https://github.com/singha111subhajit/dhoonhub-apk/releases/latest/download/app-release.apk'
         }), 500
 
 @app.route('/api/download/info')
