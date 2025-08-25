@@ -80,11 +80,18 @@ class DhoonHubService : Service() {
                 if (playbackState == Player.STATE_READY) {
                     val dur = runCatching { player.duration }.getOrElse { 0L }
                     if (dur > 0) PlaybackStateHolder.update(durationMs = dur)
+                } else if (playbackState == Player.STATE_ENDED) {
+                    Log.d(TAG, "Playback state changed to STATE_ENDED. Repeat mode: ${player.repeatMode}")
                 }
             }
 
             // 🔑 This is the important fix
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                Log.d(TAG, "Media item transition. Reason: $reason. Repeat mode: ${player.repeatMode}")
+                if (player.repeatMode == Player.REPEAT_MODE_ONE) {
+                    // If repeat one is enabled, don't change the index, just loop the current song
+                    return
+                }
                 currentPlaylistIndex = player.currentMediaItemIndex
                 val song = currentPlaylist.getOrNull(currentPlaylistIndex)
                 if (song != null) {
@@ -139,9 +146,10 @@ class DhoonHubService : Service() {
                 }
                 ACTION_TOGGLE_REPEAT -> {
                     player.repeatMode =
-                        if (player.repeatMode == Player.REPEAT_MODE_OFF) Player.REPEAT_MODE_ALL
+                        if (player.repeatMode == Player.REPEAT_MODE_OFF) Player.REPEAT_MODE_ONE
                         else Player.REPEAT_MODE_OFF
-                    PlaybackStateHolder.update(isRepeat = player.repeatMode != Player.REPEAT_MODE_OFF)
+                    Log.d(TAG, "Repeat mode set to: ${player.repeatMode}")
+                    PlaybackStateHolder.update(isRepeat = player.repeatMode == Player.REPEAT_MODE_ONE)
                     updateNotification()
                 }
                 ACTION_SEEK_TO -> {

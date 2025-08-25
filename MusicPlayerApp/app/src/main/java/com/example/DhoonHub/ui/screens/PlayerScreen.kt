@@ -170,6 +170,38 @@ fun PlayerScreen(nav: NavController) {
                         IconButton(onClick = { DhoonHubService.sendControl(context, DhoonHubService.ACTION_TOGGLE_REPEAT) }) {
                             Icon(Icons.Default.Repeat, contentDescription = "Repeat", tint = if (uiState.isRepeat) MaterialTheme.colorScheme.primary else Color.White)
                         }
+
+                        val currentUrl = uiState.currentUrl
+                        IconButton(onClick = {
+                            val song = Song(
+                                id = currentUrl,
+                                title = uiState.title,
+                                artist = uiState.artist,
+                                url = currentUrl ?: "",
+                                thumbnail = uiState.artworkUrl
+                            )
+                            if (!song.url.startsWith("http") || isDownloaded || downloading) return@IconButton
+                            downloading = true
+                            scope.launch {
+                                try {
+                                    if (repo.downloadSong(song)) {
+                                        isDownloaded = true
+                                    }
+                                } finally {
+                                    downloading = false
+                                }
+                            }
+                        }) {
+                            when {
+                                downloading -> CircularProgressIndicator(
+                                    color = Color.White,
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                isDownloaded -> Icon(Icons.Default.Check, contentDescription = "Downloaded", tint = Color.White)
+                                else -> Icon(Icons.Default.Download, contentDescription = "Download", tint = Color.White)
+                            }
+                        }
                     }
                 }
 
