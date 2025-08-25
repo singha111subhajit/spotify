@@ -1,4 +1,5 @@
-from flask import Flask, render_template, jsonify, send_from_directory, request
+
+from flask import Flask, render_template, jsonify, send_from_directory, request, redirect
 from flask_cors import CORS
 import os
 import urllib.parse
@@ -1305,3 +1306,73 @@ def api_stats():
 # For production, run this app with a WSGI server such as gunicorn:
 #   gunicorn -w 4 -b 0.0.0.0:5600 app:app
 # Do NOT use Flask's built-in server in production.
+
+@app.route('/api/download/android')
+def download_android_apk():
+    """Redirect to the latest Android APK download"""
+    try:
+        apk_download_url = "https://github.com/singha111subhajit/dhoonhub-apk/releases/latest/download/app-release.apk"
+        
+        # Option 1: Direct redirect to the APK download (recommended)
+        return redirect(apk_download_url, code=302)
+        
+        # # Option 2: If you want to track downloads or provide additional info
+        # return jsonify({
+        #     'download_url': apk_download_url,
+        #     'app_name': 'DhoonHub',
+        #     'platform': 'Android',
+        #     'file_name': 'app-release.apk',
+        #     'instructions': 'Enable "Install from unknown sources" in your Android settings before installing'
+        # })
+        
+    except Exception as e:
+        print(f"Error in download_android_apk: {e}")
+        return jsonify({
+            'error': 'Failed to get download link',
+            'message': 'Please try again later or visit our GitHub releases page directly'
+        }), 500
+
+@app.route('/api/download/info')
+def download_info():
+    """Get information about available downloads"""
+    try:
+        return jsonify({
+            'android': {
+                'available': True,
+                'download_url': '/api/download/android',
+                'direct_url': 'https://github.com/singha111subhajit/dhoonhub-apk/releases/latest/download/app-release.apk',
+                'platform': 'Android',
+                'file_name': 'app-release.apk',
+                'instructions': [
+                    'Enable "Install from unknown sources" in Android settings',
+                    'Download the APK file',
+                    'Open the downloaded file to install',
+                    'Grant necessary permissions when prompted'
+                ]
+            },
+            'web': {
+                'available': True,
+                'url': request.host_url,
+                'platform': 'Web Browser',
+                'description': 'Access DhoonHub directly in your web browser'
+            }
+        })
+    except Exception as e:
+        print(f"Error in download_info: {e}")
+        return jsonify({'error': 'Failed to get download information'}), 500
+
+# Add this route if you want to provide download info via API:
+
+@app.route('/api/download/direct')
+def get_direct_download():
+    """Get direct download URL for frontend"""
+    try:
+        return jsonify({
+            'download_url': 'https://github.com/singha111subhajit/dhoonhub-apk/releases/latest/download/app-release.apk',
+            'file_name': 'dhoonhub-app.apk',
+            'app_name': 'DhoonHub',
+            'version': 'latest',
+            'platform': 'Android'
+        })
+    except Exception as e:
+        return jsonify({'error': 'Failed to get download URL'}), 500

@@ -87,3 +87,6 @@ I am using github singha111subhajit account here
      psql "postgresql://user:password@host:5432/dbname"
      ```
 5.using uptime monitor tool to create frequent api call to make render alive
+
+
+flask run --host=0.0.0.0 --port=5600 --debug

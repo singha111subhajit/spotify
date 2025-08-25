@@ -682,6 +682,39 @@ function App() {
     return baseStyle;
   };
 
+  // Add this function after the other handler functions (around line 400-500)
+  const handleDownloadAndroid = async () => {
+    try {
+      setIsLoading(true);
+      showToast('Starting download...');
+      
+      // Direct download from GitHub releases
+      const directDownloadUrl = "https://github.com/singha111subhajit/dhoonhub-apk/releases/latest/download/app-release.apk";
+      
+      // Create a temporary anchor element for download
+      const link = document.createElement('a');
+      link.href = directDownloadUrl;
+      link.download = 'dhoonhub-app.apk';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      
+      // Append to body, click, and remove
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showToast('Download started! Check your downloads folder.');
+    } catch (error) {
+      console.error('Download error:', error);
+      showToast('Download failed. Please try again.');
+      
+      // Fallback: open in new tab
+      window.open("https://github.com/singha111subhajit/dhoonhub-apk/releases/latest/download/app-release.apk", '_blank');
+    } finally {
+      setTimeout(() => setIsLoading(false), 1000);
+    }
+  };
+
   // Styles with mobile responsiveness
   const styles = {
     container: getContainerStyle(),
@@ -1072,6 +1105,30 @@ function App() {
           <h1 style={styles.title}>🎵 DhoonHub</h1>
           <div style={{ position: 'absolute', top: 20, right: 20, display: 'flex', gap: 12 }}>
             <button onClick={toggleTheme} style={{ border: 'none', background: 'none', color: 'var(--text-main)', fontSize: 18, cursor: 'pointer' }}>{getThemeLabel()}</button>
+            {/* Download Android App Button */}
+            <button
+              onClick={handleDownloadAndroid}
+              style={{
+                ...styles.searchButton,
+                backgroundColor: isLoading ? '#ccc' : '#25D366', // WhatsApp green color
+                marginLeft: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)',
+                padding: 'clamp(8px, 2vw, 12px) clamp(12px, 3vw, 16px)',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                opacity: isLoading ? 0.7 : 1,
+                transition: 'all 0.3s ease'
+              }}
+              disabled={isLoading}
+              title="Download DhoonHub Android App"
+            >
+              <span>{isLoading ? '⏳' : '📱'}</span>
+              <span style={{ display: window.innerWidth > 480 ? 'inline' : 'none' }}>
+                {isLoading ? 'Downloading...' : 'Download App'}
+              </span>
+            </button>
             {user ? (
               <button onClick={() => setPlaylistSidebarOpen(true)} style={{ border: 'none', background: '#1db954', color: '#fff', borderRadius: 20, padding: '8px 18px', fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>My Playlists</button>
             ) : (
@@ -1101,7 +1158,6 @@ function App() {
             handleRemoveSongFromPlaylist={handleRemoveSongFromPlaylist}
           />
         ) : null}
-        {/* No add-to-playlist modal needed for single playlist */}
         {toast && <div className="toast">{toast}</div>}
 
         {/* Search */}
@@ -1232,6 +1288,65 @@ function App() {
             styles={styles}
             audioRef={audioRef}
           />
+          
+          {/* Download Section */}
+          <div style={{
+            marginTop: '20px',
+            padding: '15px',
+            backgroundColor: 'var(--bg-main)',
+            borderRadius: '15px',
+            textAlign: 'center',
+            border: '1px solid var(--border-main)'
+          }}>
+            <p style={{
+              margin: '0 0 10px 0',
+              fontSize: 'clamp(0.8rem, 2.5vw, 0.9rem)',
+              color: 'var(--text-secondary)'
+            }}>
+              Get the mobile app for better experience
+            </p>
+            <button
+              onClick={handleDownloadAndroid}
+              style={{
+                ...styles.searchButton,
+                backgroundColor: '#25D366',
+                border: 'none',
+                borderRadius: '25px',
+                padding: '12px 24px',
+                fontSize: 'clamp(0.9rem, 2.5vw, 1rem)',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                margin: '0 auto',
+                minWidth: '160px',
+                boxShadow: '0 4px 15px rgba(37, 211, 102, 0.3)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.boxShadow = '0 6px 20px rgba(37, 211, 102, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = '0 4px 15px rgba(37, 211, 102, 0.3)';
+              }}
+              disabled={isLoading}
+              title="Download DhoonHub Android App"
+            >
+              <span style={{ fontSize: '1.2rem' }}>📱</span>
+              <span>Download Android App</span>
+            </button>
+            <p style={{
+              margin: '8px 0 0 0',
+              fontSize: 'clamp(0.7rem, 2vw, 0.8rem)',
+              color: 'var(--text-secondary)',
+              opacity: 0.8
+            }}>
+              Works offline • No ads • Better performance
+            </p>
+          </div>
         </div>
 
         {/* Song List - ENLARGED by removing keyboard shortcuts */}
