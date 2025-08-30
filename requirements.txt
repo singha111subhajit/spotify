@@ -11,3 +11,4 @@ SQLAlchemy==2.0.20
 Flask-SQLAlchemy==3.0.3
 Flask-Migrate==4.0.0
 Flask-Migrate
+beautifulsoup4

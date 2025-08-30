@@ -13,6 +13,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from functools import wraps
 from flask_migrate import Migrate
+from flask import request, jsonify
+from urllib.parse import quote
+import requests
+from bs4 import BeautifulSoup
 
 
 # Add these imports at the top of your file
@@ -37,7 +41,7 @@ JWT_ALGO = 'HS256'
 JWT_EXP_DELTA_SECONDS = 7 * 24 * 3600  # 7 days
 
 import dotenv
-dotenv.load_dotenv()
+dotenv.load_dotenv(dotenv_path=".flaskenv")
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
@@ -606,6 +610,144 @@ def api_search():
         traceback.print_exc()
         return jsonify({'error': 'Search failed'}), 500
 
+@app.route('/api/artist_songs/<artist_name>')
+def api_artist_songs(artist_name):
+    """Get all songs for a given artist from JioSaavn."""
+    try:
+        if not artist_name:
+            return jsonify({'error': 'Artist name parameter required'}), 400
+
+        # Use the existing search function to find songs related to the artist
+        # We fetch a large number of songs to ensure we get most of the artist's top songs.
+        jiosaavn_songs, total_found = search_jiosaavn(artist_name, page=1, per_page=100)
+        
+        # Filter the results to only include songs where the artist name is a close match
+        artist_songs = [
+            song for song in jiosaavn_songs
+            if artist_name.lower() in song.get('artist', '').lower()
+        ]
+
+        print(f"Found {len(artist_songs)} songs for artist '{artist_name}' out of {len(jiosaavn_songs)} results.")
+
+        def secure_song(song):
+            if song.get('source') == 'jiosaavn':
+                song = song.copy()
+                song['url'] = upgrade_url(song.get('url'))
+                if song.get('thumbnail'):
+                    song['thumbnail'] = upgrade_url(song.get('thumbnail'))
+            return song
+
+        all_results = [secure_song(song) for song in artist_songs]
+        
+        response_data = {
+            'songs': all_results,
+            'total': len(all_results),
+            'query': artist_name,
+        }
+        
+        return jsonify(response_data)
+    except Exception as e:
+        print(f"Error in api_artist_songs: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to fetch artist songs'}), 500
+    
+
+#http://127.0.0.1:5600/api/artist?name=arijit%20singh
+@app.route('/api/artist', methods=['GET'])
+def search_artist():
+    try:
+        # Get artist name from query params
+        artist_name = request.args.get("name")
+        if not artist_name:
+            return jsonify({
+                "error": "Please provide an artist name",
+                "artist": None
+            }), 400
+
+        # Call JioSaavn unofficial API
+        url = f"https://saavn.dev/api/search/artists?query={artist_name}&page=0&limit=10"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        if not data.get("success") or not data["data"]["results"]:
+            return jsonify({
+                "error": f"No artist found for '{artist_name}'",
+                "artist": None
+            }), 404
+
+        # Take the first best match
+        artist = data["data"]["results"][0]
+
+        # pick best image
+        image_url = None
+        if "image" in artist and artist["image"]:
+            image_url = artist["image"][-1]["url"]
+
+        artist_details = {
+            "id": artist.get("id"),
+            "name": artist.get("name"),
+            "role": artist.get("role"),
+            "image": image_url
+        }
+
+        return jsonify({
+            "artist": artist_details
+        })
+
+    except requests.RequestException as e:
+        print(f"Network error fetching artist details: {e}")
+        return jsonify({
+            "error": "Failed to fetch artist details",
+            "artist": None
+        }), 500
+    except Exception as e:
+        print(f"Error in search_artist: {e}")
+        return jsonify({
+            "error": "Unexpected error",
+            "artist": None
+        }), 500
+
+# http://127.0.0.1:5600/api/popular-artists?page=1&limit=15
+@app.route('/api/popular-artists', methods=['GET'])
+def get_popular_artists():
+    try:
+        POPULAR_ARTISTS = [
+    "Arijit Singh", "Shreya Ghoshal", "Sonu Nigam", "Kumar Sanu",
+    "Alka Yagnik", "Udit Narayan", "Lata Mangeshkar", "Kishore Kumar",
+    "Asha Bhosle", "Mohit Chauhan", "Neha Kakkar", "Sunidhi Chauhan",
+    "Armaan Malik", "Jubin Nautiyal", "Shaan", "Monali Thakur",
+    "Rupankar Bagchi", "Anupam Roy", "Nachiketa Chakraborty",
+    "Anjan Dutt", "Hemanta Mukherjee", "Manna Dey",
+    "Raghav Chattopadhyay", "Lopamudra Mitra", "Kabir Suman"
+]
+        # Pagination params
+        page = int(request.args.get("page", 1))
+        limit = int(request.args.get("limit", 10))
+        start = (page - 1) * limit
+        end = start + limit
+
+        # Slice popular artists
+        artists_slice = POPULAR_ARTISTS[start:end]
+
+        return jsonify({
+            "total": len(POPULAR_ARTISTS),
+            "page": page,
+            "limit": limit,
+            "artists": artists_slice
+        })
+
+    except Exception as e:
+        print(f"Error in get_popular_artists: {e}")
+        return jsonify({
+            "error": "Unexpected error",
+            "total": 0,
+            "artists": []
+        }), 500
+
+
+
 @app.route('/api/random')
 def api_random():
     """Get a random song for default selection"""
@@ -1011,65 +1153,7 @@ def api_song_info(song_id):
         print(f"Error getting song info: {e}")
         return jsonify({'error': 'Failed to get song info'}), 500
 
-@app.route('/api/songs/by-artist/<artist_name>')
-def api_songs_by_artist(artist_name):
-    """Get all songs by a specific artist"""
-    try:
-        static_songs = get_static_songs()
-        popular_songs = get_popular_songs(20)
-        all_songs = static_songs + popular_songs
-        
-        artist_songs = [
-            song for song in all_songs 
-            if artist_name.lower() in song['artist'].lower()
-        ]
-        
-        return jsonify({
-            'artist': artist_name,
-            'songs': artist_songs,
-            'total': len(artist_songs)
-        })
-    except Exception as e:
-        print(f"Error getting songs by artist: {e}")
-        return jsonify({'error': 'Failed to get songs by artist'}), 500
 
-@app.route('/api/artists')
-def api_artists():
-    """Get list of all artists"""
-    try:
-        static_songs = get_static_songs()
-        popular_songs = get_popular_songs(20)
-        all_songs = static_songs + popular_songs
-        
-        artists = {}
-        for song in all_songs:
-            artist = song['artist']
-            if artist not in artists:
-                artists[artist] = {
-                    'name': artist,
-                    'song_count': 0,
-                    'albums': set()
-                }
-            artists[artist]['song_count'] += 1
-            if song.get('album'):
-                artists[artist]['albums'].add(song['album'])
-        
-        # Convert sets to lists for JSON serialization
-        for artist in artists.values():
-            artist['albums'] = list(artist['albums'])
-            artist['album_count'] = len(artist['albums'])
-        
-        return jsonify({
-            'artists': list(artists.values()),
-            'total': len(artists)
-        })
-    except Exception as e:
-        print(f"Error getting artists: {e}")
-        return jsonify({'error': 'Failed to get artists'}), 500
-
-import requests
-from flask import request, jsonify
-from urllib.parse import quote
 
 JIO_HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Safari/537.36"}
 
@@ -1446,3 +1530,6 @@ def get_direct_download():
         })
     except Exception as e:
         return jsonify({'error': 'Failed to get download URL'}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5600)
