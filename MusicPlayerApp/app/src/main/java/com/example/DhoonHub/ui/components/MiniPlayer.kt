@@ -21,6 +21,7 @@ import coil.compose.AsyncImage
 import com.example.DhoonHub.R
 import com.example.DhoonHub.player.DhoonHubService
 import com.example.DhoonHub.player.PlaybackStateHolder
+import com.example.DhoonHub.ui.components.EqualizerAnimation
 
 @Composable
 fun MiniPlayer(
@@ -65,19 +66,23 @@ fun MiniPlayer(
                     .padding(horizontal = 8.dp)
             ) {
                 Text(
-                    text = playbackState.title.ifBlank { "Unknown Title" },
+                    text = playbackState.title ?: "Unknown Title",
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = playbackState.artist.ifBlank { "Unknown Artist" },
+                    text = playbackState.artist ?: "Unknown Artist",
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            
+
+            if (playbackState.isPlaying) {
+                EqualizerAnimation(modifier = Modifier.padding(end = 8.dp))
+            }
+
             // Play/Pause button
             IconButton(
                 onClick = {

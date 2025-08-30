@@ -48,20 +48,20 @@ fun PlayerScreen(nav: NavController) {
     LaunchedEffect(uiState.currentUrl, uiState.title, uiState.artist) {
         val url = uiState.currentUrl ?: return@LaunchedEffect
         isDownloaded = if (url.startsWith("http")) {
-            val song = Song(id = url, title = uiState.title, artist = uiState.artist, url = url)
+            val song = Song(id = url, title = uiState.title ?: "", artist = uiState.artist ?: "", url = url)
             repo.isSongDownloaded(song)
         } else true
     }
 
     LaunchedEffect(uiState.artist) {
-        val q = uiState.artist.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        val q = uiState.artist?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
         related = runCatching { musicApi.search(q).songs }.getOrDefault(emptyList())
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(uiState.title.ifBlank { "Now Playing" }) },
+                title = { Text(uiState.title?.ifBlank { "Now Playing" } ?: "Now Playing") },
                 navigationIcon = {
                     IconButton(onClick = { nav.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -102,18 +102,18 @@ fun PlayerScreen(nav: NavController) {
                 ) {
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        uiState.title.ifBlank { "Unknown Title" },
+                        uiState.title?.ifBlank { "Unknown Title" } ?: "Unknown Title",
                         style = MaterialTheme.typography.titleLarge,
                         color = Color.White
                     )
                     Text(
-                        uiState.artist.ifBlank { "Unknown Artist" },
+                        uiState.artist?.ifBlank { "Unknown Artist" } ?: "Unknown Artist",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.85f)
                     )
                     Spacer(Modifier.height(16.dp))
 
-                    val duration = uiState.durationMs.takeIf { it > 0 } ?: 1L
+                    val duration = uiState.durationMs.takeIf { it > 0L } ?: 1L
                     Slider(
                         value = (uiState.positionMs / duration.toFloat()).coerceIn(0f, 1f),
                         onValueChange = { fraction ->
@@ -121,7 +121,7 @@ fun PlayerScreen(nav: NavController) {
                             PlaybackStateHolder.update(positionMs = newPos)
                         },
                         onValueChangeFinished = {
-                            PlaybackStateHolder.seekTo(context, uiState.positionMs)
+                            DhoonHubService.sendSeekTo(context, uiState.positionMs)
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -175,8 +175,8 @@ fun PlayerScreen(nav: NavController) {
                         IconButton(onClick = {
                             val song = Song(
                                 id = currentUrl,
-                                title = uiState.title,
-                                artist = uiState.artist,
+                                title = uiState.title ?: "",
+                                artist = uiState.artist ?: "",
                                 url = currentUrl ?: "",
                                 thumbnail = uiState.artworkUrl
                             )
