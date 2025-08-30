@@ -1274,6 +1274,36 @@ def api_albums():
         print(f"Error getting albums: {e}")
         return jsonify({'error': 'Failed to get albums'}), 500
 
+@app.route('/api/album_songs')
+def api_album_songs():
+    """Get full song list for a single album (lazy load)."""
+    try:
+        album_name = request.args.get("album")
+        if not album_name:
+            return jsonify({'error': 'Album name required'}), 400
+
+        # Fetch album songs from JioSaavn
+        album_songs, _ = search_jiosaavn(album_name, page=1, per_page=50)
+
+        # Upgrade URLs if available
+        for s in album_songs:
+            if s.get('url'):
+                s['url'] = upgrade_url(s['url'])
+            if s.get('thumbnail'):
+                s['thumbnail'] = upgrade_url(s['thumbnail'])
+
+        # Prepare response
+        return jsonify({
+            'album': album_name,
+            'songs': album_songs,
+            'song_count': len(album_songs),
+            'duration': sum(int(s.get('duration', 0)) for s in album_songs if s.get('duration'))
+        })
+
+    except Exception as e:
+        print(f"Error fetching songs for album {album_name}: {e}")
+        return jsonify({'error': 'Failed to get album songs'}), 500
+
 # Add a cache management endpoint for debugging/admin purposes
 @app.route('/api/cache/albums/clear')
 def clear_albums_cache():
