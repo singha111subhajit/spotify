@@ -344,23 +344,52 @@ fun HomeScreen(
                 }
             }
         } else if (selectedType == "Artists") {
-            LaunchedEffect(Unit) {
-                if (musicViewModel.popularArtists.isEmpty()) {
-                    musicViewModel.loadPopularArtists()
+            if (musicViewModel.isSearchingArtists) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            } else if (musicViewModel.artistSearchError != null) {
+                Text(
+                    "Error: ${musicViewModel.artistSearchError}",
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(16.dp)
+                )
+            } else if (artistSearchQuery.isNotBlank() && musicViewModel.artistSearchResults.isEmpty()) {
+                Text(
+                    text = "No artists found for $artistSearchQuery",
+                    modifier = Modifier.padding(16.dp)
+                )
+            } else if (musicViewModel.artistSearchResults.isNotEmpty()) {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 140.dp),
+                    contentPadding = PaddingValues(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    items(musicViewModel.artistSearchResults) { artist ->
+                        ArtistCard(artistName = artist.name, musicViewModel = musicViewModel, onClick = {
+                            navController.navigate("artist/${artist.name}")
+                        })
+                    }
                 }
-            }
+            } else {
+                LaunchedEffect(Unit) {
+                    if (musicViewModel.popularArtists.isEmpty()) {
+                        musicViewModel.loadPopularArtists()
+                    }
+                }
 
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 140.dp),
-                contentPadding = PaddingValues(4.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                items(musicViewModel.popularArtists) { artistName ->
-                    ArtistCard(artistName = artistName, musicViewModel = musicViewModel, onClick = {
-                        navController.navigate("artist/${artistName}")
-                    })
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 140.dp),
+                    contentPadding = PaddingValues(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    items(musicViewModel.popularArtists) { artistName ->
+                        ArtistCard(artistName = artistName, musicViewModel = musicViewModel, onClick = {
+                            navController.navigate("artist/${artistName}")
+                        })
+                    }
                 }
             }
         }

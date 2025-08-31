@@ -184,4 +184,14 @@ class MusicRepository(private val context: Context) {
             }
         }
     }
+
+    suspend fun searchArtistByName(name: String): TrendingArtist? {
+        return withContext(Dispatchers.IO) {
+            try {
+                musicApi.getArtistDetails(name).artist
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
 }

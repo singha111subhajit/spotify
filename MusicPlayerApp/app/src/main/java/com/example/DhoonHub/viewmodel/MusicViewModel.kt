@@ -270,7 +270,7 @@ class MusicViewModel(private val context: Context) : ViewModel() {
 
         viewModelScope.launch {
             try {
-                val artist = musicRepository.getArtistDetails(artistName)
+                val artist = musicRepository.searchArtistByName(artistName)
                 artistSearchResults = if (artist != null) listOf(artist) else emptyList()
             } catch (e: Exception) {
                 artistSearchError = "Artist search failed: ${e.message}"
