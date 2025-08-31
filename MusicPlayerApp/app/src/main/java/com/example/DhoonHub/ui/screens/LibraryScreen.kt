@@ -91,9 +91,7 @@ fun LibraryScreen(
     
     // Function to check if a song is downloaded
     fun isSongDownloaded(song: Song): Boolean {
-        val songId = song.id ?: song.title
-        return downloadedSongIds.contains(songId) || 
-               offlineSongs.any { it.url == song.url || it.title == song.title }
+        return repo.isSongDownloaded(song)
     }
     
     // Initial load of offline songs and download states
@@ -179,17 +177,12 @@ fun LibraryScreen(
                         rootNav.navigate("player")
                     },
                     onDeleteSong = { song ->
-                        // Find the corresponding file and delete it
-                        val offlineFiles = repo.getOfflineSongs()
-                        val fileToDelete = offlineFiles.find { file ->
-                            val filename = file.nameWithoutExtension
-                            val parts = filename.split("-")
-                            val artist = if (parts.size > 1) parts[0] else "Unknown Artist"
-                            val title = if (parts.size > 2) parts[1] else filename
-                            artist == song.artist && title == song.title
+                        coroutineScope.launch {
+                            withContext(Dispatchers.IO) {
+                                repo.deleteDownloadedSong(song)
+                            }
+                            refreshOfflineSongs()
                         }
-                        fileToDelete?.delete()
-                        refreshOfflineSongs()
                     }
                 )
                 1 -> OnlineTab(
@@ -569,7 +562,7 @@ fun OnlineTab(
                             song = song,
                             onPlayClick = { onSongClick(song) },
                             onDownloadClick = { onDownloadClick(song) },
-                            isDownloaded = isSongDownloaded(song),
+                            isSongDownloaded = isSongDownloaded(song),
                             isDownloading = downloadingSongs.contains(song.id.orEmpty())
                         )
                     }
@@ -711,7 +704,7 @@ fun OnlineSongItem(
     song: Song,
     onPlayClick: () -> Unit,
     onDownloadClick: () -> Unit,
-    isDownloaded: Boolean,
+    isSongDownloaded: Boolean,
     isDownloading: Boolean
 ) {
     ElevatedCard(
@@ -773,12 +766,12 @@ fun OnlineSongItem(
                     // Download button with proper state
                     IconButton(
                         onClick = onDownloadClick,
-                        enabled = !isDownloaded && !isDownloading
+                        enabled = !isSongDownloaded && !isDownloading
                     ) {
                         Icon(
-                            if (isDownloaded) Icons.Default.Check else Icons.Default.Download,
-                            contentDescription = if (isDownloaded) "Already Downloaded" else "Download",
-                            tint = if (isDownloaded) MaterialTheme.colorScheme.primary 
+                            if (isSongDownloaded) Icons.Default.Check else Icons.Default.Download,
+                            contentDescription = if (isSongDownloaded) "Already Downloaded" else "Download",
+                            tint = if (isSongDownloaded) MaterialTheme.colorScheme.primary 
                                   else MaterialTheme.colorScheme.secondary
                         )
                     }
