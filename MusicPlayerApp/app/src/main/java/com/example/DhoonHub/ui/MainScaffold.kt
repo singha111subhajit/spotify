@@ -19,6 +19,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavController
@@ -32,6 +33,9 @@ import com.example.DhoonHub.ui.screens.HomeScreen
 import com.example.DhoonHub.ui.screens.LibraryScreen
 import com.example.DhoonHub.ui.screens.ProfileScreen
 import com.example.DhoonHub.ui.screens.SearchScreen
+import com.example.DhoonHub.ui.screens.AlbumScreen
+import com.example.DhoonHub.ui.screens.ArtistScreen
+import com.example.DhoonHub.player.PlaybackStateHolder
 import com.example.DhoonHub.viewmodel.MusicViewModel
 import kotlinx.coroutines.launch
 import android.widget.Toast
@@ -140,6 +144,14 @@ fun MainScaffold(
                                     }
                                 }
                             )
+                            DropdownMenuItem(
+                                text = { Text("Clear Artist Cache") },
+                                onClick = {
+                                    showMenu = false
+                                    musicViewModel.clearArtistCache()
+                                    Toast.makeText(context, "Artist cache cleared", Toast.LENGTH_SHORT).show()
+                                }
+                            )
                         }
                     }
                 )
@@ -175,10 +187,18 @@ fun MainScaffold(
                     navController = navController,
                     startDestination = Screen.Home.route
                 ) {
-                    composable(Screen.Home.route) { HomeScreen(rootNavController, musicViewModel) }
-                    composable(Screen.Search.route) { SearchScreen(rootNavController) }
+                    composable(Screen.Home.route) { HomeScreen(navController, rootNavController, musicViewModel) }
+                    composable(Screen.Search.route) { SearchScreen(rootNavController, musicViewModel) }
                     composable(Screen.Library.route) { LibraryScreen(rootNavController, musicViewModel.musicRepository) }
                     composable(Screen.Profile.route) { ProfileScreen(rootNavController) }
+                    composable("album/{albumName}") { backStackEntry ->
+                        val albumName = backStackEntry.arguments?.getString("albumName") ?: ""
+                        AlbumScreen(navController = navController, rootNavController = rootNavController, albumName = albumName, musicViewModel = musicViewModel)
+                    }
+                    composable("artist/{artistName}") { backStackEntry ->
+                        val artistName = backStackEntry.arguments?.getString("artistName") ?: ""
+                        ArtistScreen(artistName = artistName, navController = navController, rootNavController = rootNavController, musicViewModel = musicViewModel, playbackState = PlaybackStateHolder.uiState.collectAsState().value)
+                    }
                 }
 
                 // Add MiniPlayer at the bottom

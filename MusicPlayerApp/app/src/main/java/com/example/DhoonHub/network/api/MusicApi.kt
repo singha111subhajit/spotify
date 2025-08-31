@@ -29,6 +29,21 @@ data class AddSongRequest(val song_id: String, val song_title: String)
 
 data class ClearCacheResponse(val message: String, val status: String)
 
+data class TrendingArtist(
+    val id: String,
+    val name: String,
+    val image: String,
+    val role: String,
+    val type: String,
+    val url: String
+)
+
+data class PopularArtistsResponse(val artists: List<String>)
+
+data class ArtistDetailsResponse(val artist: TrendingArtist)
+
+data class ArtistSongsResponse(val songs: List<Song>)
+
 interface MusicApi {
     @GET("api/songs")
     suspend fun getSongs(): SongsResponse
@@ -66,4 +81,13 @@ interface MusicApi {
 
     @GET("api/cache/albums/clear")
     suspend fun clearAlbumsCache(): ClearCacheResponse
+
+    @GET("/api/popular-artists")
+    suspend fun getPopularArtists(@Query("page") page: Int? = null, @Query("limit") limit: Int? = null): PopularArtistsResponse
+
+    @GET("/api/artist")
+    suspend fun getArtistDetails(@Query("name") artistName: String): ArtistDetailsResponse
+
+    @GET("/api/artist_songs/{artist_name}")
+    suspend fun getArtistSongs(@Path("artist_name") artistName: String): ArtistSongsResponse
 }

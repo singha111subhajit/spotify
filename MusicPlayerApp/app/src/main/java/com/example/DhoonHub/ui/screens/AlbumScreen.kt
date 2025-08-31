@@ -21,7 +21,8 @@ import androidx.compose.foundation.clickable // Import clickable
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlbumScreen(
-    rootNav: NavController,
+    navController: NavController,
+    rootNavController: NavController,
     albumName: String,
     musicViewModel: MusicViewModel
 ) {
@@ -41,7 +42,7 @@ fun AlbumScreen(
             TopAppBar(
                 title = { Text(albumName) },
                 navigationIcon = {
-                    IconButton(onClick = { rootNav.popBackStack() }) {
+                    IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back"
@@ -64,7 +65,7 @@ fun AlbumScreen(
                                 songs,
                                 index
                             )
-                            rootNav.navigate("player")
+                            rootNavController.navigate("player")
                         },
                         leadingContent = {
                             AsyncImage(
@@ -81,7 +82,7 @@ fun AlbumScreen(
                                     songs,
                                     index
                                 )
-                                rootNav.navigate("player")
+                                rootNavController.navigate("player")
                             }) {
                                 Icon(
                                     imageVector = Icons.Filled.PlayArrow,

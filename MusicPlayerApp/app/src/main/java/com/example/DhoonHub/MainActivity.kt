@@ -75,7 +75,7 @@ fun AppNav() {
                     val albumName = backStackEntry.arguments?.getString("albumName")
                     if (albumName != null) {
                         // Use the shared ViewModel instance
-                        AlbumScreen(rootNav = navController, albumName = albumName, musicViewModel = musicViewModel)
+                        AlbumScreen(navController = navController, rootNavController = navController, albumName = albumName, musicViewModel = musicViewModel)
                     } else {
                         // Handle the case where albumName is null, e.g., show an error or navigate back
                         Text("Error: Album not found") // Or some other error handling

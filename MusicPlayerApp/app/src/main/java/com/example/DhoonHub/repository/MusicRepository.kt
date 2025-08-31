@@ -7,6 +7,7 @@ import com.example.DhoonHub.model.Playlist
 import com.example.DhoonHub.model.Song
 import com.example.DhoonHub.network.RetrofitProvider
 import com.example.DhoonHub.network.api.AddSongRequest
+import com.example.DhoonHub.network.api.TrendingArtist
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -152,5 +153,35 @@ class MusicRepository(private val context: Context) {
         val thumbnailsDir = File(dir, ".thumbnails")
         val targetFile = File(thumbnailsDir, sanitizeFilename("$songId.jpg"))
         return targetFile
+    }
+
+    suspend fun getPopularArtists(page: Int, limit: Int): List<String> {
+        return withContext(Dispatchers.IO) {
+            try {
+                musicApi.getPopularArtists(page, limit).artists
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+    }
+
+    suspend fun getArtistDetails(artistName: String): TrendingArtist? {
+        return withContext(Dispatchers.IO) {
+            try {
+                musicApi.getArtistDetails(artistName).artist
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    suspend fun getArtistSongs(artistName: String): List<Song> {
+        return withContext(Dispatchers.IO) {
+            try {
+                musicApi.getArtistSongs(artistName).songs
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
     }
 }

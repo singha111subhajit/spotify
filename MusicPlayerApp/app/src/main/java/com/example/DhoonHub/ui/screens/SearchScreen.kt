@@ -1,3 +1,4 @@
+
 package com.example.DhoonHub.ui.screens
 
 import androidx.compose.foundation.layout.*
@@ -8,40 +9,29 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.DhoonHub.R
 import com.example.DhoonHub.model.Song
-import com.example.DhoonHub.network.RetrofitProvider
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import com.example.DhoonHub.viewmodel.MusicViewModel
+import com.example.DhoonHub.player.DhoonHubService
 import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen(rootNav: NavController) {
+fun SearchScreen(rootNav: NavController, musicViewModel: MusicViewModel) {
     val context = LocalContext.current
-    val retrofit = remember { RetrofitProvider.getRetrofit(context) }
-    val musicApi = remember { com.example.DhoonHub.network.api.MusicApi::class.java.let { retrofit.create(it) } }
     var query by remember { mutableStateOf("") }
-    var results by remember { mutableStateOf<List<Song>>(emptyList()) }
-    var loading by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    var searchJob by remember { mutableStateOf<Job?>(null) }
+
+    val artistSongs = musicViewModel.artistSongs
+    val isLoadingArtistSongs = musicViewModel.isLoadingArtistSongs
+    val artistSongsError = musicViewModel.artistSongsError
 
     fun triggerSearch() {
-        searchJob?.cancel()
-        searchJob = scope.launch {
-            loading = true
-            delay(300)
-            runCatching {
-                val resp = musicApi.search(q = query)
-                results = resp.songs
-            }.onFailure { }
-            loading = false
+        if (query.length >= 2) {
+            musicViewModel.loadArtistSongs(query)
+        } else {
+            musicViewModel.clearArtistSongs()
         }
     }
 
@@ -51,15 +41,22 @@ fun SearchScreen(rootNav: NavController) {
                 value = query,
                 onValueChange = {
                     query = it
-                    if (query.length >= 2) triggerSearch() else results = emptyList()
+                    triggerSearch()
                 },
-                label = { Text("Search for songs, artists, albums, or playlists…") },
+                label = { Text("Search for songs by artist…") },
                 singleLine = true,
             )
             Spacer(Modifier.height(12.dp))
-            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (isLoadingArtistSongs) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (artistSongsError != null) {
+                Text(
+                    text = "Error: $artistSongsError",
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
             LazyColumn(Modifier.fillMaxSize()) {
-                items(results) { song ->
+                items(artistSongs) { song ->
                     ListItem(
                         leadingContent = {
                             AsyncImage(
@@ -76,7 +73,7 @@ fun SearchScreen(rootNav: NavController) {
                                 val url = song.url
                                 if (url.isNotBlank()) {
                                     runCatching {
-                                        com.example.DhoonHub.player.DhoonHubService.startPlayUrl(context, 
+                                        DhoonHubService.startPlayUrl(context, 
                                             listOf(song),
                                             0)
                                         rootNav.navigate("player")
