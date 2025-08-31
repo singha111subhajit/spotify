@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.*
 import com.example.DhoonHub.network.api.Album
 import androidx.compose.foundation.clickable
 import com.example.DhoonHub.ui.components.SongListItem
+import com.example.DhoonHub.player.PlaybackStateHolder // Added import
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,6 +32,8 @@ fun AlbumScreen(
     val context = LocalContext.current
     var songs by remember { mutableStateOf(listOf<Song>()) }
     var loading by remember { mutableStateOf(true) }
+
+    val playbackState by PlaybackStateHolder.uiState.collectAsState() // Collect playback state
 
     LaunchedEffect(albumName) {
         loading = true
@@ -60,9 +63,10 @@ fun AlbumScreen(
             }
             LazyColumn(Modifier.fillMaxSize()) {
                 itemsIndexed(songs) { index, song ->
+                    val isPlaying = playbackState.currentUrl == song.url // Determine if song is playing
                     SongListItem(
                         song = song,
-                        isPlaying = false, // Adjust this based on your playback state
+                        isPlaying = isPlaying,
                         onClick = {
                             DhoonHubService.startPlayUrl(
                                 context,
