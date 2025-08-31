@@ -123,20 +123,7 @@ fun OnlineScreen(
                     }
                 }
                 
-                if (isLoadingMore) {
-                    LinearProgressIndicator(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        progress = { 0.5f }
-                    )
-                    Text(
-                        text = "Loading more…",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                }
+                
             }
             
             if (searchQuery.isNotBlank() && filteredSongs.isNotEmpty()) {
