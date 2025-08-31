@@ -178,9 +178,7 @@ fun HomeScreen(
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     items(musicViewModel.popularArtists) { artistName ->
-                                        ArtistCard(artistName = artistName, musicViewModel = musicViewModel, onClick = {
-                                            navController.navigate("artist/${artistName}")
-                                        })
+                                        ArtistCardWrapper(artistName = artistName, musicViewModel = musicViewModel, navController = navController)
                                     }
                                 }
                             }
@@ -321,9 +319,7 @@ fun HomeScreen(
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     items(musicViewModel.popularArtists) { artistName ->
-                                        ArtistCard(artistName = artistName, musicViewModel = musicViewModel, onClick = {
-                                            navController.navigate("artist/${artistName}")
-                                        })
+                                        ArtistCardWrapper(artistName = artistName, musicViewModel = musicViewModel, navController = navController)
                                     }
                                     if (musicViewModel.isLoadingPopularArtists) {
                                         item {
@@ -366,7 +362,7 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     items(musicViewModel.artistSearchResults) { artist ->
-                        ArtistCard(artistName = artist.name, musicViewModel = musicViewModel, onClick = {
+                        ArtistCard(artistName = artist.name, artistImage = artist.image, onClick = {
                             navController.navigate("artist/${artist.name}")
                         })
                     }
@@ -386,12 +382,29 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     items(musicViewModel.popularArtists) { artistName ->
-                        ArtistCard(artistName = artistName, musicViewModel = musicViewModel, onClick = {
-                            navController.navigate("artist/${artistName}")
-                        })
+                        ArtistCardWrapper(artistName = artistName, musicViewModel = musicViewModel, navController = navController)
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+fun ArtistCardWrapper(artistName: String, musicViewModel: MusicViewModel, navController: NavController) {
+    var artist by remember { mutableStateOf<TrendingArtist?>(null) }
+
+    LaunchedEffect(artistName) {
+        artist = musicViewModel.getArtistDetails(artistName)
+    }
+
+    artist?.let {
+        ArtistCard(
+            artistName = it.name,
+            artistImage = it.image,
+            onClick = {
+                navController.navigate("artist/${it.name}")
+            }
+        )
     }
 }

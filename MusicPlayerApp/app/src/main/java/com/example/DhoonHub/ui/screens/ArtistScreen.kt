@@ -29,7 +29,6 @@ import com.example.DhoonHub.player.PlaybackUiState
 @Composable
 fun ArtistScreen(
     artistName: String,
-    navController: NavController,
     rootNavController: NavController,
     musicViewModel: MusicViewModel,
     playbackState: PlaybackUiState

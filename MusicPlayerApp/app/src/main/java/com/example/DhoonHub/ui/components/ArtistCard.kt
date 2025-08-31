@@ -3,65 +3,40 @@ package com.example.DhoonHub.ui.components
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.DhoonHub.R
-import com.example.DhoonHub.network.api.TrendingArtist
-import com.example.DhoonHub.viewmodel.MusicViewModel
+import androidx.compose.ui.Alignment // Add this import
 
 @Composable
-fun ArtistCard(artistName: String, musicViewModel: MusicViewModel, onClick: () -> Unit) {
-    var artist by remember { mutableStateOf<TrendingArtist?>(null) }
-
-    LaunchedEffect(artistName) {
-        artist = musicViewModel.getArtistDetails(artistName)
-    }
-
-    LaunchedEffect(artist) {
-        android.util.Log.d("DhoonHub", "ArtistCard - Artist: $artist")
-    }
-
+fun ArtistCard(artistName: String, artistImage: String, onClick: () -> Unit) {
     Card(
         modifier = Modifier
-            .padding(4.dp)
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(4.dp)
+            .fillMaxWidth()
+            .padding(8.dp)
+            .clickable(onClick = onClick)
     ) {
-        Column(
+        Row(
             modifier = Modifier.padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            verticalAlignment = Alignment.CenterVertically
         ) {
             AsyncImage(
-                model = artist?.image,
-                contentDescription = artist?.name,
+                model = artistImage,
+                contentDescription = artistName,
                 modifier = Modifier
-                    .size(120.dp)
+                    .size(64.dp)
                     .clip(MaterialTheme.shapes.medium),
-                placeholder = painterResource(R.drawable.ic_music_note),
-                error = painterResource(R.drawable.ic_music_note),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop // Ensures the image fills the box
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.width(16.dp))
             Text(
                 text = artistName,
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                maxLines = 2
+                style = MaterialTheme.typography.bodyLarge
             )
         }
     }

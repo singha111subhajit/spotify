@@ -197,7 +197,7 @@ fun MainScaffold(
                     }
                     composable("artist/{artistName}") { backStackEntry ->
                         val artistName = backStackEntry.arguments?.getString("artistName") ?: ""
-                        ArtistScreen(artistName = artistName, navController = navController, rootNavController = rootNavController, musicViewModel = musicViewModel, playbackState = PlaybackStateHolder.uiState.collectAsState().value)
+                        ArtistScreen(artistName = artistName, rootNavController = rootNavController, musicViewModel = musicViewModel, playbackState = PlaybackStateHolder.uiState.collectAsState().value)
                     }
                 }
 
