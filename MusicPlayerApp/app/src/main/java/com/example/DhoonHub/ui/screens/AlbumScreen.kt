@@ -32,7 +32,7 @@ fun AlbumScreen(
 
     LaunchedEffect(albumName) {
         loading = true
-        // Let the ViewModel handle the caching and fetching logic
+        // Fetch songs for the album
         songs = musicViewModel.getAlbumSongs(albumName)
         loading = false
     }
