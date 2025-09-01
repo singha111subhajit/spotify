@@ -12,6 +12,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.remember // Import remember
 
 @Composable
 fun EqualizerAnimation(
@@ -19,13 +20,14 @@ fun EqualizerAnimation(
     barColor: Color = MaterialTheme.colorScheme.primary
 ) {
     val infiniteTransition = rememberInfiniteTransition()
-    val animationValues = (1..4).map {
+    val animationValues = (1..4).map { index -> // Use index for unique random values
+        val duration = remember(index) { (400..600).random() } // Remember duration per bar
         infiniteTransition.animateFloat(
             initialValue = 0.1f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
                 animation = tween(
-                    durationMillis = (400..600).random(),
+                    durationMillis = duration, // Use remembered duration
                     easing = FastOutSlowInEasing
                 ),
                 repeatMode = RepeatMode.Reverse

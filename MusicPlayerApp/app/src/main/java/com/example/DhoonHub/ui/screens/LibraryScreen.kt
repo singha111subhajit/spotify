@@ -174,7 +174,6 @@ fun LibraryScreen(
                     isSongDownloaded = { song -> isSongDownloaded(song) },
                     downloadingSongs = downloadingSongs,
                     canLoadMore = canLoadMore,
-                    isLoadingMore = isLoadingMore,
                     onLoadMore = {
                         if (canLoadMore && !isSearching) {
                             coroutineScope.launch {

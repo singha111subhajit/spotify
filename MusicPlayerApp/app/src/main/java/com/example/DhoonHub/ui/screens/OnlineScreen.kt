@@ -34,7 +34,6 @@ fun OnlineScreen(
     isSongDownloaded: (Song) -> Boolean,
     downloadingSongs: Set<String>,
     canLoadMore: Boolean,
-    isLoadingMore: Boolean,
     onLoadMore: () -> Unit
 ) {
     val filteredSongs = songs

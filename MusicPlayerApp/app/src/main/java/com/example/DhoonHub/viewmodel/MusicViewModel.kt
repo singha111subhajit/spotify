@@ -123,7 +123,7 @@ class MusicViewModel(private val context: Context) : ViewModel() {
                     }
 
                 if (fetchedAlbums.isNotEmpty()) {
-                    albums = if (page == 1) fetchedAlbums.shuffled() else albums + fetchedAlbums.shuffled() // Append for pagination
+                    albums = if (page == 1) fetchedAlbums else albums + fetchedAlbums // Append for pagination
                     currentAlbumPage = page
                     canLoadMoreAlbums = fetchedAlbums.size == perPage // Update canLoadMoreAlbums
                 } else {
@@ -179,21 +179,8 @@ class MusicViewModel(private val context: Context) : ViewModel() {
         
         viewModelScope.launch {
             try {
-                val offlineFiles = musicRepository.getOfflineSongs()
-                offlineSongs = offlineFiles.map { file ->
-                    // Parse filename to extract song info
-                    val filename = file.nameWithoutExtension
-                    val parts = filename.split("-")
-                    val artist = if (parts.size > 1) parts[0] else "Unknown Artist"
-                    val title = if (parts.size > 2) parts[1] else filename
-                    Song(
-                        id = file.absolutePath,
-                        title = title,
-                        artist = artist,
-                        url = file.absolutePath,
-                        thumbnail = null,
-                    )
-                }
+                val offlineFiles = musicRepository.getOfflineSongsWithMetadata()
+                offlineSongs = offlineFiles
             } catch (e: Exception) {
                 // Handle error
             } finally {
@@ -325,15 +312,7 @@ class MusicViewModel(private val context: Context) : ViewModel() {
         loadOfflineSongs()
     }
     
-    // Provide a public method to access musicApi
-    fun getMusicApi(): MusicApi {
-        return musicApi
-    }
-
-    // Provide a public method to access albumSongsCache
-    fun cacheAlbumSongs(albumName: String, songs: List<Song>) {
-        albumSongsCache[albumName] = songs
-    }
+    
     
     // Add this method to your MusicViewModel class
     fun clearAlbumSearchResults() {

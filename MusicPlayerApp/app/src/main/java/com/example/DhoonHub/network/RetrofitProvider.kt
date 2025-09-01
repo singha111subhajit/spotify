@@ -1,6 +1,7 @@
 package com.example.DhoonHub.network
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import com.example.DhoonHub.config.ApiConfig
 import com.example.DhoonHub.network.api.AuthApi
 import com.example.DhoonHub.network.api.MusicApi
@@ -22,8 +23,9 @@ object RetrofitProvider {
     }
 
     private fun buildRetrofit(context: Context): Retrofit {
+        val isDebuggable = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
         val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (isDebuggable) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
         }
         val tokenStorage = TokenStorage.getInstance(context)
         val okHttp = OkHttpClient.Builder()
