@@ -1324,7 +1324,7 @@ def api_albums():
         for q in queries:
             for page in range(1, 3):  # fetch 2 pages per query
                 try:
-                    jio_songs, _ = search_jiosaavn(q, page=page, per_page=40)
+                    jio_songs, _ = search_jiosaavn(q, page=page, per_page=10)
                     for s in jio_songs:
                         if s.get('url'):
                             s['url'] = upgrade_url(s['url'])
@@ -1356,7 +1356,7 @@ def api_albums():
         for album_name, album in albums.items():
             try:
                 # search specifically for this album to get all its songs
-                album_songs, _ = search_jiosaavn(album_name, page=1, per_page=50)
+                album_songs, _ = search_jiosaavn(album_name, page=1, per_page=10)
                 for s in album_songs:
                     if s.get('url'):
                         s['url'] = upgrade_url(s['url'])
