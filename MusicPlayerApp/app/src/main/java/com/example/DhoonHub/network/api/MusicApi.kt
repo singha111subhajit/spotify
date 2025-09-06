@@ -45,8 +45,12 @@ data class ArtistDetailsResponse(val artist: TrendingArtist)
 data class ArtistSongsResponse(val songs: List<Song>)
 
 interface MusicApi {
-    @GET("api/songs")
-    suspend fun getSongs(): SongsResponse
+    @GET("api/search")
+    suspend fun getSongs(
+        @Query("q") q: String = "hindi",
+        @Query("page") page: Int = 1,
+        @Query("per_page") perPage: Int = 20
+    ): SongsResponse
 
     @GET("playlists")
     suspend fun getPlaylists(): PlaylistsResponse

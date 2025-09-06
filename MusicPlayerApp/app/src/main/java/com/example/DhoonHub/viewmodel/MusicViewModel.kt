@@ -13,9 +13,13 @@ import com.example.DhoonHub.network.api.Album
 import com.example.DhoonHub.network.api.TrendingArtist
 import com.example.DhoonHub.network.api.MusicApi
 import com.example.DhoonHub.repository.MusicRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MusicViewModel(private val context: Context) : ViewModel() {
+
+    private var searchJob: Job? = null
     
     // Albums state
     var albums by mutableStateOf<List<Album>>(emptyList())
@@ -32,6 +36,12 @@ class MusicViewModel(private val context: Context) : ViewModel() {
         private set
     var onlineSongsError by mutableStateOf<String?>(null)
         private set
+    var currentOnlineSongPage by mutableStateOf(1)
+        private set
+    var canLoadMoreOnlineSongs by mutableStateOf(true)
+        private set
+    var isPaginatingOnlineSongs by mutableStateOf(false)
+        private set
     
     // Offline songs state
     var offlineSongs by mutableStateOf<List<Song>>(emptyList())
@@ -45,6 +55,9 @@ class MusicViewModel(private val context: Context) : ViewModel() {
     var isSearching by mutableStateOf(false)
         private set
     var searchError by mutableStateOf<String?>(null)
+        private set
+
+    var searchQuery by mutableStateOf("")
         private set
 
     // Album search results
@@ -102,6 +115,7 @@ class MusicViewModel(private val context: Context) : ViewModel() {
         // Load initial data
         loadAlbums(page = currentAlbumPage) // Call with initial page
         loadOfflineSongs()
+        loadOnlineSongs(page = currentOnlineSongPage)
     }
     
     fun loadAlbums(page: Int = 1, perPage: Int = 20) { // Add parameters
@@ -132,7 +146,7 @@ class MusicViewModel(private val context: Context) : ViewModel() {
 
                 // Handle creating albums from songs if no albums were returned (existing logic)
                 if (albums.isEmpty() && page == 1) { // Only do this fallback for the first page if no albums
-                    val songs = runCatching { musicApi.getSongs().songs }
+                    val songs = runCatching { musicApi.getSongs(page = 1).songs }
                         .getOrElse {
                             albumsError = "Failed to fetch songs: ${it.message}"
                             emptyList()
@@ -173,8 +187,6 @@ class MusicViewModel(private val context: Context) : ViewModel() {
     }
     
     fun loadOfflineSongs() {
-        if (offlineSongs.isNotEmpty()) return // Don't reload if we already have data
-        
         isLoadingOfflineSongs = true
         
         viewModelScope.launch {
@@ -189,23 +201,51 @@ class MusicViewModel(private val context: Context) : ViewModel() {
         }
     }
     
-    fun loadOnlineSongs() {
-        if (onlineSongs.isNotEmpty()) return // Don't reload if we already have data
-        
-        isLoadingOnlineSongs = true
-        onlineSongsError = null
-        
+    fun loadOnlineSongs(page: Int = 1) {
+        if (isLoadingOnlineSongs || isPaginatingOnlineSongs || !canLoadMoreOnlineSongs) return
+
+        if (page == 1) {
+            isLoadingOnlineSongs = true
+            onlineSongsError = null
+        } else {
+            isPaginatingOnlineSongs = true
+        }
+
         viewModelScope.launch {
             try {
-                onlineSongs = musicRepository.getSongsOnline()
+                val fetchedSongs = musicRepository.getSongsOnline(page)
+                if (fetchedSongs.isNotEmpty()) {
+                    onlineSongs = if (page == 1) fetchedSongs else onlineSongs + fetchedSongs
+                    currentOnlineSongPage = page
+                    canLoadMoreOnlineSongs = fetchedSongs.size == 10 // Assuming 10 per page
+                } else {
+                    canLoadMoreOnlineSongs = false
+                }
             } catch (e: Exception) {
                 onlineSongsError = "Failed to load online songs: ${e.message}"
+                canLoadMoreOnlineSongs = false
             } finally {
                 isLoadingOnlineSongs = false
+                isPaginatingOnlineSongs = false
             }
         }
     }
+
+    fun loadMoreOnlineSongs() {
+        if (canLoadMoreOnlineSongs && !isLoadingOnlineSongs && !isPaginatingOnlineSongs) {
+            loadOnlineSongs(page = currentOnlineSongPage + 1)
+        }
+    }
     
+    fun onSearchQueryChanged(query: String) {
+        searchQuery = query
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            delay(500L)
+            searchSongs(query)
+        }
+    }
+
     fun searchSongs(query: String, page: Int = 1, perPage: Int = 20) {
         if (query.isBlank()) {
             searchResults = emptyList()

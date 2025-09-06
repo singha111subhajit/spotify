@@ -3,6 +3,7 @@ package com.example.DhoonHub.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
@@ -23,7 +24,8 @@ import com.example.DhoonHub.model.Song
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnlineScreen(
-    songs: List<Song>,
+    onlineSongs: List<Song>,
+    searchResults: List<Song>,
     isLoading: Boolean,
     error: String?,
     searchQuery: String,
@@ -33,185 +35,155 @@ fun OnlineScreen(
     onDownloadClick: (Song) -> Unit,
     isSongDownloaded: (Song) -> Boolean,
     downloadingSongs: Set<String>,
-    canLoadMore: Boolean,
-    onLoadMore: () -> Unit
+    selectedSongIds: Set<String>,
+    onToggleSelection: (String) -> Unit,
+    loadMoreOnlineSongs: () -> Unit,
+    isPaginatingOnlineSongs: Boolean
 ) {
-    val filteredSongs = songs
-    
-    if (isLoading) {
-        Box(
-            Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+    val songsToShow = if (searchQuery.isBlank()) onlineSongs else searchResults
+    val listState = rememberLazyListState()
+
+    Column(Modifier.fillMaxSize()) {
+        // Search Bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            CircularProgressIndicator()
-        }
-    } else if (error != null) {
-        Box(
-            Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = error,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("Search for songs...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                singleLine = true,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(percent = 50)
             )
-        }
-    } else if (songs.isEmpty()) {
-        Box(
-            Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    "Search for songs to get results from DhoonHub",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            if (searchQuery.isNotEmpty()) {
+                IconButton(onClick = { onSearchQueryChange("") }) {
+                    Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                }
             }
         }
-    } else {
-        Column(
-            Modifier.fillMaxSize()
-        ) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+
+        // Loading Indicator
+        if (isLoading || isSearching) {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                contentAlignment = Alignment.Center
             ) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { onSearchQueryChange(it) },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("Search…") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
-                    singleLine = true
+                CircularProgressIndicator()
+            }
+        }
+
+        // Error Message
+        error?.let {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium
                 )
-                
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { onSearchQueryChange("") }) {
-                        Icon(
-                            Icons.Default.Clear,
-                            contentDescription = "Clear search"
-                        )
-                    }
-                }
-                
-                if (!isSearching) {
-                    Text(
-                        text = "${filteredSongs.size} song${if (filteredSongs.size != 1) "s" else ""}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    )
-                }
-                
-                if (filteredSongs.isNotEmpty()) {
-                    val undownloadedSongs = filteredSongs.filter { !isSongDownloaded(it) }
-                    if (undownloadedSongs.isNotEmpty()) {
-                        Button(
-                            onClick = {
-                                undownloadedSongs.forEach { song ->
-                                    onDownloadClick(song)
-                                }
-                            },
-                            enabled = downloadingSongs.isEmpty()
-                        ) {
-                            Text("Download All (${undownloadedSongs.size})")
-                        }
-                    }
-                }
-                
-                
             }
-            
-            if (searchQuery.isNotBlank() && filteredSongs.isNotEmpty()) {
-                Card(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-                ) {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 280.dp)
-                            .padding(vertical = 4.dp)
-                    ) {
-                        items(filteredSongs.take(6)) { s ->
-                            ListItem(
-                                leadingContent = {
-                                    AsyncImage(
-                                        model = s.thumbnail,
-                                        contentDescription = s.title,
-                                        modifier = Modifier.size(40.dp),
-                                        placeholder = painterResource(R.drawable.ic_music_note),
-                                        error = painterResource(R.drawable.ic_music_note)
-                                    )
-                                },
-                                headlineContent = { Text(s.title, maxLines = 1) },
-                                supportingContent = { Text(s.artist, maxLines = 1) },
-                                trailingContent = {
-                                    TextButton(onClick = { onSongClick(s) }) { Text("Play") }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 8.dp)
-                            )
-                        }
-                    }
-                }
-            }
-            if (isSearching) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            } else if (filteredSongs.isEmpty() && searchQuery.isNotEmpty()) {
+        }
+
+        // Results / Empty State
+        if (!isLoading && !isSearching && error == null) {
+            if (songsToShow.isEmpty()) {
+                // Empty State
                 Box(
-                    Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
                             Icons.Default.Search,
-                            contentDescription = "No results",
+                            contentDescription = "Search",
                             modifier = Modifier.size(48.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            "No songs found matching '$searchQuery'",
+                            if (searchQuery.isBlank()) "No online songs found."
+                            else "No songs found matching '$searchQuery'",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             } else {
+                // Results List
                 LazyColumn(
-                    Modifier.fillMaxSize(),
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredSongs) { song ->
+                    // Header with song count and download all button
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "${songsToShow.size} song${if (songsToShow.size != 1) "s" else ""}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            val selectedSongs = songsToShow.filter { selectedSongIds.contains(it.id) }
+                            if (selectedSongs.isNotEmpty()) {
+                                Button(
+                                    onClick = { selectedSongs.forEach { onDownloadClick(it) } },
+                                    enabled = downloadingSongs.isEmpty()
+                                ) {
+                                    Text("Download Selected (${selectedSongs.size})")
+                                }
+                            } else {
+                                val undownloadedSongs = songsToShow.filter { !isSongDownloaded(it) }
+                                if (undownloadedSongs.isNotEmpty()) {
+                                    Button(
+                                        onClick = { undownloadedSongs.forEach { onDownloadClick(it) } },
+                                        enabled = downloadingSongs.isEmpty()
+                                    ) {
+                                        Text("Download All (${undownloadedSongs.size})")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    items(songsToShow) { song ->
                         OnlineSongItem(
                             song = song,
+                            isSelected = selectedSongIds.contains(song.id),
+                            onToggleSelection = { onToggleSelection(song.id.orEmpty()) },
                             onPlayClick = { onSongClick(song) },
                             onDownloadClick = { onDownloadClick(song) },
                             isSongDownloaded = isSongDownloaded(song),
                             isDownloading = downloadingSongs.contains(song.id.orEmpty())
                         )
                     }
-                    item(key = "load-more") {
-                        if (filteredSongs.isNotEmpty() && canLoadMore && !isSearching) {
-                            LaunchedEffect(filteredSongs.size, searchQuery) {
-                                onLoadMore()
-                            }
-                            Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+
+                    if (isPaginatingOnlineSongs) {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 CircularProgressIndicator()
                             }
                         }
+                    }
+                }
+
+                LaunchedEffect(listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index) {
+                    val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+                    if (lastVisibleItem != null && lastVisibleItem.index >= songsToShow.size - 5) {
+                        loadMoreOnlineSongs()
                     }
                 }
             }
@@ -222,6 +194,8 @@ fun OnlineScreen(
 @Composable
 fun OnlineSongItem(
     song: Song,
+    isSelected: Boolean,
+    onToggleSelection: () -> Unit,
     onPlayClick: () -> Unit,
     onDownloadClick: () -> Unit,
     isSongDownloaded: Boolean,
@@ -237,7 +211,8 @@ fun OnlineSongItem(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Checkbox(checked = isSelected, onCheckedChange = if (isSongDownloaded) { _: Boolean -> } else { _ -> onToggleSelection() })
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(
                     model = song.thumbnail,
                     contentDescription = song.title,
@@ -303,15 +278,5 @@ fun OnlineSongItem(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun CircularProgressAnimated(isVisible: Boolean) {
-    if (isVisible) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(28.dp),
-            strokeWidth = 2.dp
-        )
     }
 }

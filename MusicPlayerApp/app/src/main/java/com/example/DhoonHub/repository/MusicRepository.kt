@@ -25,7 +25,7 @@ class MusicRepository(private val context: Context) {
         private const val TAG = "MusicRepository"
     }
 
-    suspend fun getSongsOnline(): List<Song> = musicApi.getSongs().songs
+    suspend fun getSongsOnline(page: Int): List<Song> = musicApi.getSongs(page = page).songs
     suspend fun searchSongsOnline(query: String, page: Int = 1, perPage: Int = 20): List<Song> =
         musicApi.search(q = query, page = page, perPage = perPage).songs
     suspend fun getPlaylistsOnline(): List<Playlist> = musicApi.getPlaylists().playlists

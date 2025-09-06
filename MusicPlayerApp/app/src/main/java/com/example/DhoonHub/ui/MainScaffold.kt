@@ -189,7 +189,7 @@ fun MainScaffold(
                 ) {
                     composable(Screen.Home.route) { HomeScreen(navController, rootNavController, musicViewModel) }
                     composable(Screen.Search.route) { SearchScreen(rootNavController, musicViewModel) }
-                    composable(Screen.Library.route) { LibraryScreen(rootNavController, musicViewModel.musicRepository) }
+                    composable(Screen.Library.route) { LibraryScreen(rootNavController, musicViewModel) }
                     composable(Screen.Profile.route) { ProfileScreen(rootNavController) }
                     composable("album/{albumName}") { backStackEntry ->
                         val albumName = backStackEntry.arguments?.getString("albumName") ?: ""

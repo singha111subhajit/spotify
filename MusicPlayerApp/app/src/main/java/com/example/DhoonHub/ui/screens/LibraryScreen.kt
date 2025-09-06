@@ -11,7 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
 import com.example.DhoonHub.model.Song
 import com.example.DhoonHub.player.DhoonHubService
-import com.example.DhoonHub.repository.MusicRepository
+import com.example.DhoonHub.viewmodel.MusicViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -20,29 +20,20 @@ import kotlinx.coroutines.withContext
 @Composable
 fun LibraryScreen(
     rootNav: NavController,
-    repo: MusicRepository
+    musicViewModel: MusicViewModel
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     
     var currentTab by remember { mutableStateOf(0) }
-    var offlineSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
-    var onlineSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
     var downloadingSongs by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var downloadedSongIds by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var onlineSearchQuery by remember { mutableStateOf("") }
-    var isSearching by remember { mutableStateOf(false) }
-    var isLoadingMore by remember { mutableStateOf(false) }
-    var currentPage by remember { mutableStateOf(1) }
-    var canLoadMore by remember { mutableStateOf(true) }
+    var selectedSongIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+
+    // Offline songs are managed by the ViewModel
+    val offlineSongs = musicViewModel.offlineSongs
 
     fun refreshOfflineSongs() {
-        coroutineScope.launch {
-            offlineSongs = repo.getOfflineSongsWithMetadata()
-            downloadedSongIds = offlineSongs.mapNotNull { it.id }.toSet()
-        }
+        musicViewModel.loadOfflineSongs()
     }
     
     fun downloadSong(song: Song) {
@@ -53,10 +44,9 @@ fun LibraryScreen(
         
         coroutineScope.launch {
             try {
-                val success = repo.downloadSong(song)
+                val success = musicViewModel.musicRepository.downloadSong(song)
                 if (success) {
                     refreshOfflineSongs()
-                    downloadedSongIds = downloadedSongIds + songId
                 }
             } finally {
                 downloadingSongs = downloadingSongs - songId
@@ -65,47 +55,24 @@ fun LibraryScreen(
     }
     
     fun isSongDownloaded(song: Song): Boolean {
-        return repo.isSongDownloaded(song)
+        return musicViewModel.musicRepository.isSongDownloaded(song)
+    }
+
+    fun onToggleSelection(songId: String) {
+        selectedSongIds = if (selectedSongIds.contains(songId)) {
+            selectedSongIds - songId
+        } else {
+            selectedSongIds + songId
+        }
     }
     
     LaunchedEffect(Unit) {
         refreshOfflineSongs()
     }
 
-    LaunchedEffect(Unit) {
-        refreshOfflineSongs()
-    }
-
-    LaunchedEffect(currentTab, onlineSearchQuery) {
-        if (currentTab == 1) {
-            error = null
-            if (onlineSearchQuery.isBlank()) {
-                isLoading = onlineSongs.isEmpty()
-                isSearching = true
-                try {
-                    currentPage = 1
-                    val first = repo.searchSongsOnline("Hindi", page = currentPage, perPage = 20)
-                    onlineSongs = first
-                    canLoadMore = first.isNotEmpty()
-                } catch (e: Exception) {
-                    error = "Failed to load online songs: ${e.message}"
-                } finally {
-                    isLoading = false
-                    isSearching = false
-                }
-            } else {
-                isSearching = true
-                try {
-                    currentPage = 1
-                    val first = repo.searchSongsOnline(onlineSearchQuery, page = currentPage, perPage = 20)
-                    onlineSongs = first
-                    canLoadMore = first.isNotEmpty()
-                } catch (e: Exception) {
-                    error = "Search failed: ${e.message}"
-                } finally {
-                    isSearching = false
-                }
-            }
+    LaunchedEffect(currentTab) {
+        if (currentTab == 1 && musicViewModel.onlineSongs.isEmpty()) {
+            musicViewModel.loadOnlineSongs()
         }
     }
 
@@ -131,7 +98,7 @@ fun LibraryScreen(
                 Tab(
                     selected = currentTab == 1,
                     onClick = { currentTab = 1 },
-                    text = { Text("Online (${onlineSongs.size})") },
+                    text = { Text("Online") }, // Size is now managed inside OnlineScreen
                     icon = { Icon(Icons.Default.MusicNote, contentDescription = "Online") }
                 )
             }
@@ -146,24 +113,30 @@ fun LibraryScreen(
                     onDeleteSong = { song ->
                         coroutineScope.launch {
                             withContext(Dispatchers.IO) {
-                                repo.deleteDownloadedSong(song)
+                                musicViewModel.musicRepository.deleteDownloadedSong(song)
                             }
                             refreshOfflineSongs()
                         }
                     }
                 )
                 1 -> OnlineScreen(
-                    songs = onlineSongs,
-                    isLoading = isLoading,
-                    error = error,
-                    searchQuery = onlineSearchQuery,
-                    isSearching = isSearching,
-                    onSearchQueryChange = { q -> onlineSearchQuery = q },
+                    onlineSongs = musicViewModel.onlineSongs,
+                    searchResults = musicViewModel.searchResults,
+                    isLoading = musicViewModel.isLoadingOnlineSongs,
+                    error = musicViewModel.searchError,
+                    searchQuery = musicViewModel.searchQuery,
+                    isSearching = musicViewModel.isSearching,
+                    onSearchQueryChange = { musicViewModel.onSearchQueryChanged(it) },
                     onSongClick = { song ->
-                        val startIndex = onlineSongs.indexOf(song)
+                        val songsToPlay = if (musicViewModel.searchQuery.isBlank()) {
+                            musicViewModel.onlineSongs
+                        } else {
+                            musicViewModel.searchResults
+                        }
+                        val startIndex = songsToPlay.indexOf(song)
                         DhoonHubService.startPlayUrl(
                             context,
-                            songs = onlineSongs,
+                            songs = songsToPlay,
                             startIndex = startIndex
                         )
                         rootNav.navigate("player")
@@ -173,26 +146,10 @@ fun LibraryScreen(
                     },
                     isSongDownloaded = { song -> isSongDownloaded(song) },
                     downloadingSongs = downloadingSongs,
-                    canLoadMore = canLoadMore,
-                    onLoadMore = {
-                        if (canLoadMore && !isSearching) {
-                            coroutineScope.launch {
-                                isLoadingMore = true
-                                currentPage += 1
-                                val next = if (onlineSearchQuery.isBlank()) {
-                                    repo.searchSongsOnline("top", page = currentPage, perPage = 20)
-                                } else {
-                                    repo.searchSongsOnline(onlineSearchQuery, page = currentPage, perPage = 20)
-                                }
-                                if (next.isEmpty()) {
-                                    canLoadMore = false
-                                } else {
-                                    onlineSongs = onlineSongs + next
-                                }
-                                isLoadingMore = false
-                            }
-                        }
-                    }
+                    selectedSongIds = selectedSongIds,
+                    onToggleSelection = ::onToggleSelection,
+                    loadMoreOnlineSongs = { musicViewModel.loadMoreOnlineSongs() },
+                    isPaginatingOnlineSongs = musicViewModel.isPaginatingOnlineSongs
                 )
             }
         }
