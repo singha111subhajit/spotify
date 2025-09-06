@@ -325,137 +325,169 @@ def upgrade_url(url):
         return 'https://' + url[len('http://'):]
     return url
 
+# Add this constant at the top of your file, near JIOSAAVN_API_BASE
+JIOSAAVN_INTERNAL_PAGE_SIZE = 10 # Observed limit of JioSaavn /search/songs endpoint
+
 # --- JioSaavn API search ---
 def search_jiosaavn(query, page=1, per_page=20):
-    """Search for songs using the JioSaavn public API (unofficial)"""
+    """
+    Search for songs using the JioSaavn public API (unofficial).
+    Fetches enough internal pages to satisfy the requested per_page.
+    Returns a list of processed songs and the count of songs fetched.
+    """
+    all_songs_from_jiosaavn = []
+    
+    # Calculate how many internal JioSaavn API pages we need to fetch
+    # to cover the requested 'per_page' for the current 'page'.
+    # We need to fetch from (page-1)*per_page + 1 to page*per_page
+    # If page=1, per_page=20, we need songs 1-20.
+    # If JioSaavn_internal_page_size is 10, we need JioSaavn pages 1 and 2.
+    # If page=2, per_page=20, we need songs 21-40.
+    # We need JioSaavn pages 3 and 4.
 
-    try:
-        print(f"Searching JioSaavn for: '{query}' (page={page}, per_page={per_page})")
-        params = {
-            'query': query,
-            'page': page
-        }
-        url = f"{JIOSAAVN_API_BASE}/search/songs"
-        response = requests.get(url, params=params, timeout=10)
-        print(f"JioSaavn API status: {response.status_code}")
-        if response.status_code == 200:
-            data = response.json()
-            print('JioSaavn API raw response keys:', list(data.keys()))  # DEBUG: print response structure
-            songs = []
-            # JioSaavn API returns results in data['results']
-            results = data.get('data', {}).get('results', [])
+    # Determine the starting internal page for JioSaavn API
+    # This is the first JioSaavn page that contains data for our requested 'page'
+    jiosaavn_start_page = ((page - 1) * per_page) // JIOSAAVN_INTERNAL_PAGE_SIZE + 1
 
-            for item in results[:per_page]:
-                # Enhanced metadata extraction
+    # Determine how many internal JioSaavn API calls are needed
+    # to cover the 'per_page' songs for the current 'page'
+    num_internal_calls = (per_page + JIOSAAVN_INTERNAL_PAGE_SIZE - 1) // JIOSAAVN_INTERNAL_PAGE_SIZE
 
-                # Extract title with fallbacks
-                title = item.get('name') or item.get('title') or 'Unknown Title'
+    print(f"Searching JioSaavn for: '{query}' (requested page={page}, per_page={per_page})")
+    print(f"Internal JioSaavn calls: starting from page {jiosaavn_start_page}, {num_internal_calls} calls needed.")
 
-                # Enhanced artist extraction with multiple fallbacks
-                artist = None
-                # ...existing code for artist extraction...
-                if item.get('artists') and isinstance(item['artists'], dict) and 'primary' in item['artists']:
-                    primary_artists = item['artists']['primary']
-                    if isinstance(primary_artists, list) and primary_artists:
-                        artist_names = [a['name'] for a in primary_artists if isinstance(a, dict) and a.get('name')]
-                        if artist_names:
-                            artist = ', '.join(artist_names)
-                if not artist and item.get('primaryArtists'):
-                    if isinstance(item['primaryArtists'], str):
-                        artist = item['primaryArtists']
-                if not artist and item.get('artists'):
-                    if isinstance(item['artists'], str):
-                        artist = item['artists']
-                if not artist:
-                    artist = item.get('artist')
-                if not artist and item.get('artistMap') and item['artistMap'].get('primary_artists'):
-                    pa = item['artistMap']['primary_artists']
-                    if isinstance(pa, list) and pa and isinstance(pa[0], dict):
-                        artist = pa[0].get('name')
-                if isinstance(artist, str):
-                    artist = artist.strip()
-                    if not artist or artist.lower() in ['unknown', 'unknown artist', '']:
-                        artist = 'Unknown Artist'
+    for i in range(num_internal_calls):
+        current_jiosaavn_page = jiosaavn_start_page + i
+        try:
+            params = {
+                'query': query,
+                'page': current_jiosaavn_page
+            }
+            url = f"{JIOSAAVN_API_BASE}/search/songs"
+            response = requests.get(url, params=params, timeout=10)
+            print(f"JioSaavn API status for internal page {current_jiosaavn_page}: {response.status_code}")
 
-                # Enhanced album extraction
-                album = None
-                if item.get('album'):
-                    if isinstance(item['album'], dict):
-                        album = item['album'].get('name') or item['album'].get('title')
-                    elif isinstance(item['album'], str):
-                        album = item['album']
-                if not album:
-                    album = item.get('albumMap', {}).get('name') or item.get('albumName')
+            if response.status_code == 200:
+                data = response.json()
+                results = data.get('data', {}).get('results', [])
 
-                # Enhanced thumbnail extraction with multiple sizes
-                thumbnail = None
-                if item.get('image'):
-                    if isinstance(item['image'], list) and item['image']:
-                        thumbnail = item['image'][-1]
-                        if isinstance(thumbnail, dict):
-                            thumbnail = thumbnail.get('link') or thumbnail.get('url')
-                    elif isinstance(item['image'], str):
-                        thumbnail = item['image']
-                if not thumbnail:
-                    for img_field in ['imageUrl', 'image_url', 'artwork', 'cover']:
-                        if item.get(img_field):
-                            thumbnail = item[img_field]
-                            break
-                if thumbnail and isinstance(thumbnail, str):
-                    if '150x150' in thumbnail:
-                        thumbnail = thumbnail.replace('150x150', '500x500')
-                    elif '50x50' in thumbnail:
-                        thumbnail = thumbnail.replace('50x50', '500x500')
-                    thumbnail = upgrade_url(thumbnail)
+                if not results:
+                    print(f"No more results from JioSaavn for internal page {current_jiosaavn_page}.")
+                    break # No more results, stop fetching
 
-                # Enhanced year extraction
-                year = None
-                year_fields = ['year', 'releaseYear', 'release_year', 'albumYear']
-                for field in year_fields:
-                    if item.get(field):
-                        try:
-                            year_val = str(item[field])
-                            if year_val.isdigit() and len(year_val) == 4:
-                                year = int(year_val)
-                                break
-                        except:
-                            continue
+                # Add all results from this internal page
+                all_songs_from_jiosaavn.extend(results)
+            else:
+                print(f"JioSaavn API error for internal page {current_jiosaavn_page}: {response.status_code} - {response.text[:200]}")
+                break # Stop on error
+        except Exception as e:
+            print(f"Error searching JioSaavn for internal page {current_jiosaavn_page}: {e}")
+            import traceback
+            traceback.print_exc()
+            break # Stop on error
 
-                # Enhanced duration extraction (convert to seconds if needed)
-                duration = None
-                if item.get('duration'):
-                    try:
-                        duration_val = item['duration']
-                        if isinstance(duration_val, str):
-                            if ':' in duration_val:
-                                parts = duration_val.split(':')
-                                if len(parts) == 2:
-                                    minutes, seconds = int(parts[0]), int(parts[1])
-                                    duration = minutes * 60 + seconds
-                            else:
-                                duration = int(duration_val)
+    processed_songs = []
+    for item in all_songs_from_jiosaavn:
+        # ... (existing song processing logic) ...
+        title = item.get('name') or item.get('title') or 'Unknown Title'
+        artist = None
+        if item.get('artists') and isinstance(item['artists'], dict) and 'primary' in item['artists']:
+            primary_artists = item['artists']['primary']
+            if isinstance(primary_artists, list) and primary_artists:
+                artist_names = [a['name'] for a in primary_artists if isinstance(a, dict) and a.get('name')]
+                if artist_names:
+                    artist = ', '.join(artist_names)
+        if not artist and item.get('primaryArtists'):
+            if isinstance(item['primaryArtists'], str):
+                artist = item['primaryArtists']
+        if not artist and item.get('artists'):
+            if isinstance(item['artists'], str):
+                artist = item['artists']
+        if not artist:
+            artist = item.get('artist')
+        if not artist and item.get('artistMap') and item['artistMap'].get('primary_artists'):
+            pa = item['artistMap']['primary_artists']
+            if isinstance(pa, list) and pa and isinstance(pa[0], dict):
+                artist = pa[0].get('name')
+        if isinstance(artist, str):
+            artist = artist.strip()
+            if not artist or artist.lower() in ['unknown', 'unknown artist', '']:
+                artist = 'Unknown Artist'
+
+        album = None
+        if item.get('album'):
+            if isinstance(item['album'], dict):
+                album = item['album'].get('name') or item['album'].get('title')
+            elif isinstance(item['album'], str):
+                album = item['album']
+        if not album:
+            album = item.get('albumMap', {}).get('name') or item.get('albumName')
+
+        thumbnail = None
+        if item.get('image'):
+            if isinstance(item['image'], list) and item['image']:
+                thumbnail = item['image'][-1]
+                if isinstance(thumbnail, dict):
+                    thumbnail = thumbnail.get('link') or thumbnail.get('url')
+            elif isinstance(item['image'], str):
+                thumbnail = item['image']
+        if not thumbnail:
+            for img_field in ['imageUrl', 'image_url', 'artwork', 'cover']: 
+                if item.get(img_field):
+                    thumbnail = item[img_field]
+                    break
+        if thumbnail and isinstance(thumbnail, str):
+            if '150x150' in thumbnail:
+                thumbnail = thumbnail.replace('150x150', '500x500')
+            elif '50x50' in thumbnail:
+                thumbnail = thumbnail.replace('50x50', '500x500')
+            thumbnail = upgrade_url(thumbnail)
+
+        year = None
+        year_fields = ['year', 'releaseYear', 'release_year', 'albumYear']
+        for field in year_fields:
+            if item.get(field):
+                try:
+                    year_val = str(item[field])
+                    if year_val.isdigit() and len(year_val) == 4:
+                        year = int(year_val)
+                        break
+                except:
+                    continue
+
+        duration = None
+        if item.get('duration'):
+            try:
+                duration_val = item['duration']
+                if isinstance(duration_val, str):
+                    if ':' in duration_val:
+                        parts = duration_val.split(':')
+                        if len(parts) == 2:
+                            minutes, seconds = int(parts[0]), int(parts[1])
+                            duration = minutes * 60 + seconds
                         else:
                             duration = int(duration_val)
-                    except:
-                        pass
+                    else:
+                        duration = int(duration_val)
+            except:
+                pass
 
-                # Use the best available audio URL or fallback to JioSaavn web link
-                audio_url = None
-                if 'downloadUrl' in item and item['downloadUrl']:
-                    download_urls = item['downloadUrl']
-                    if isinstance(download_urls, list):
-                        for quality in ['320kbps', '160kbps', '96kbps', '48kbps']:
-                            for d in download_urls:
-                                if isinstance(d, dict) and d.get('quality') == quality and d.get('url'):
-                                    audio_url = d['url']
-                                    break
-                            if audio_url:
-                                break
-                        if not audio_url:
-                            for d in download_urls:
-                                if isinstance(d, dict) and d.get('url'):
-                                    audio_url = d['url']
-                                    break
+        audio_url = None
+        if 'downloadUrl' in item and item['downloadUrl']:
+            download_urls = item['downloadUrl']
+            if isinstance(download_urls, list):
+                for quality in ['320kbps', '160kbps', '96kbps', '48kbps']:
+                    for d in download_urls:
+                        if isinstance(d, dict) and d.get('quality') == quality and d.get('url'):
+                            audio_url = d['url']
+                            break
+                    if audio_url:
+                        break
+                if not audio_url:
+                    for d in download_urls:
+                        if isinstance(d, dict) and d.get('url'):
+                            audio_url = d['url']
+                            break
                 if not audio_url:
                     url_fields = ['permaUrl', 'url', 'playUrl', 'streamUrl']
                     for field in url_fields:
@@ -465,29 +497,26 @@ def search_jiosaavn(query, page=1, per_page=20):
                 if audio_url:
                     audio_url = upgrade_url(audio_url)
 
-                # Only add if we have a valid url and basic metadata
-                if audio_url and title:
-                    song_data = {
-                        'id': item.get('id') or f"jiosaavn-{len(songs)}",
-                        'title': title,
-                        'artist': artist,
-                        'album': album,
-                        'year': year,
-                        'duration': duration,
-                        'url': audio_url,
-                        'source': 'jiosaavn',
-                        'thumbnail': thumbnail
-                    }
-                    songs.append(song_data)
-            print(f"Returning {len(songs)} JioSaavn songs")
-            return songs, len(results)
-        else:
-            print(f"JioSaavn API error: {response.status_code} - {response.text[:200]}")
-    except Exception as e:
-        print(f"Error searching JioSaavn: {e}")
-        import traceback
-        traceback.print_exc()
-    return [], 0
+        if audio_url and title:
+            song_data = {
+                'id': item.get('id') or f"jiosaavn-{len(processed_songs)}",
+                'title': title,
+                'artist': artist,
+                'album': album,
+                'year': year,
+                'duration': duration,
+                'url': audio_url,
+                'source': 'jiosaavn',
+                'thumbnail': thumbnail
+            }
+            processed_songs.append(song_data)
+
+    # Return only the number of songs requested by per_page
+    # The total_found will be the actual number of songs fetched, not a global total from JioSaavn
+    return processed_songs[:per_page], len(processed_songs)
+    
+
+
 
 def get_popular_songs(limit=10):
     """Get popular songs from Internet Archive"""
@@ -612,23 +641,25 @@ def api_search():
 
 @app.route('/api/artist_songs/<artist_name>')
 def api_artist_songs(artist_name):
-    """Get all songs for a given artist from JioSaavn."""
+    """Get songs for a given artist from JioSaavn with pagination."""
     try:
         if not artist_name:
             return jsonify({'error': 'Artist name parameter required'}), 400
 
-        # Use the existing search function to find songs related to the artist
-        # We fetch a large number of songs to ensure we get most of the artist's top songs.
-        jiosaavn_songs, total_found = search_jiosaavn(artist_name, page=1, per_page=100)
-        
-        # Filter the results to only include songs where the artist name is a close match
+        # Get page and per_page from query params (default: page=1, per_page=30)
+        page = int(request.args.get("page", 1))
+        per_page = int(request.args.get("per_page", 30))
+
+        # Fetch songs
+        jiosaavn_songs, total_found = search_jiosaavn(artist_name, page=page, per_page=per_page)
+
+        # Filter songs for the specific artist
         artist_songs = [
             song for song in jiosaavn_songs
             if artist_name.lower() in song.get('artist', '').lower()
         ]
 
-        print(f"Found {len(artist_songs)} songs for artist '{artist_name}' out of {len(jiosaavn_songs)} results.")
-
+        # Secure song URLs
         def secure_song(song):
             if song.get('source') == 'jiosaavn':
                 song = song.copy()
@@ -638,20 +669,24 @@ def api_artist_songs(artist_name):
             return song
 
         all_results = [secure_song(song) for song in artist_songs]
-        
+
         response_data = {
             'songs': all_results,
-            'total': len(all_results),
+            'page': page,
+            'per_page': per_page,
+            'returned': len(all_results),
+            'total_found': total_found,   # total from JioSaavn search
             'query': artist_name,
         }
-        
+
         return jsonify(response_data)
+
     except Exception as e:
         print(f"Error in api_artist_songs: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'Failed to fetch artist songs'}), 500
-    
+
 
 #http://127.0.0.1:5600/api/artist?name=arijit%20singh
 @app.route('/api/artist', methods=['GET'])
