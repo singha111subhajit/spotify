@@ -111,9 +111,17 @@ fun AppNav() {
                     )
                     when (result) {
                         SnackbarResult.ActionPerformed -> {
-                            navController.navigate("main") {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    inclusive = true
+                            if (isAuthenticated) {
+                                navController.navigate("main") {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        inclusive = true
+                                    }
+                                }
+                            } else {
+                                navController.navigate("login") {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        inclusive = true
+                                    }
                                 }
                             }
                         }
