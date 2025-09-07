@@ -12,14 +12,18 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Settings
+import com.example.DhoonHub.utils.NetworkConnectivityObserver
+import com.example.DhoonHub.utils.ConnectionStatus
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavController
@@ -35,6 +39,7 @@ import com.example.DhoonHub.ui.screens.ProfileScreen
 import com.example.DhoonHub.ui.screens.SearchScreen
 import com.example.DhoonHub.ui.screens.AlbumScreen
 import com.example.DhoonHub.ui.screens.ArtistScreen
+import com.example.DhoonHub.ui.screens.OfflineScreen
 import com.example.DhoonHub.player.PlaybackStateHolder
 import com.example.DhoonHub.viewmodel.MusicViewModel
 import kotlinx.coroutines.launch
@@ -49,6 +54,7 @@ sealed class Screen(val route: String, val icon: ImageVector, val label: String)
     object Library : Screen("library", Icons.Default.LibraryMusic, "Library")
     object Search : Screen("search", Icons.Default.Search, "Search")
     object Profile : Screen("profile", Icons.Default.Person, "Profile")
+    object Offline : Screen("offline", Icons.Default.Home, "Offline") // Using Home icon for now
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -78,14 +84,70 @@ fun MainScaffold(
     var selectedLanguage by remember { mutableStateOf(settings.getLanguage()) }
     var expandedLanguageMenu by remember { mutableStateOf(false) }
 
+    val networkStatus by NetworkConnectivityObserver(context).observe().collectAsState(initial = ConnectionStatus.Unavailable)
+    val isOnline = networkStatus == ConnectionStatus.Available
+
+    var userPreferredOfflineMode by rememberSaveable { mutableStateOf(settings.getOfflineMode()) }
+
+    LaunchedEffect(isOnline, userPreferredOfflineMode) {
+        if (!isOnline) { // Actual network is down
+            navController.navigate(Screen.Offline.route) {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    inclusive = true
+                }
+            }
+        } else { // Network is available
+            if (userPreferredOfflineMode) {
+                navController.navigate(Screen.Offline.route) {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        inclusive = true
+                    }
+                }
+            } else if (currentRoute == Screen.Offline.route) { // If currently on offline screen and user wants to be online
+                navController.navigate(Screen.Home.route) {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        inclusive = true
+                    }
+                }
+            }
+        }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet {
                 Text("DhoonHub Menu", modifier = Modifier.padding(16.dp))
                 HorizontalDivider()
-                // Removed Home NavigationDrawerItem
-                // Removed Logout NavigationDrawerItem
+                NavigationDrawerItem(
+                    label = { Text(if (userPreferredOfflineMode) "Go Online" else "Go Offline") },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        userPreferredOfflineMode = !userPreferredOfflineMode
+                        settings.setOfflineMode(userPreferredOfflineMode)
+
+                        if (userPreferredOfflineMode) {
+                            navController.navigate(Screen.Offline.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    inclusive = true
+                                }
+                            }
+                        } else {
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    inclusive = true
+                                }
+                            }
+                        }
+                    },
+                    icon = {
+                        Icon(
+                            imageVector = if (userPreferredOfflineMode) Icons.Default.Home else Icons.AutoMirrored.Filled.ExitToApp,
+                            contentDescription = if (userPreferredOfflineMode) "Go Online" else "Go Offline"
+                        )
+                    }
+                )
             }
         }
     ) {
@@ -191,6 +253,7 @@ fun MainScaffold(
                     composable(Screen.Search.route) { SearchScreen(rootNavController, musicViewModel) }
                     composable(Screen.Library.route) { LibraryScreen(rootNavController, musicViewModel) }
                     composable(Screen.Profile.route) { ProfileScreen(rootNavController) }
+                    composable(Screen.Offline.route) { OfflineScreen(musicViewModel = musicViewModel, rootNav = rootNavController) }
                     composable("album/{albumName}") { backStackEntry ->
                         val albumName = backStackEntry.arguments?.getString("albumName") ?: ""
                         AlbumScreen(navController = navController, rootNavController = rootNavController, albumName = albumName, musicViewModel = musicViewModel)
