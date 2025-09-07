@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
@@ -79,11 +80,22 @@ fun AppNav() {
             NetworkConnectivityObserver(context).observe()
         }.collectAsState(initial = ConnectionStatus.Unavailable)
 
+        val ConnectionStatusSaver = Saver<ConnectionStatus, String>(
+            save = { status -> status.javaClass.simpleName },
+            restore = {
+                when (it) {
+                    "Available" -> ConnectionStatus.Available
+                    "Unavailable" -> ConnectionStatus.Unavailable
+                    else -> ConnectionStatus.Unavailable // Default or error case
+                }
+            }
+        )
+
         var wasOffline by rememberSaveable { mutableStateOf(false) }
-        var previousNetworkStatus by rememberSaveable { mutableStateOf(networkStatus) }
+        val previousNetworkStatusString = rememberSaveable { mutableStateOf(networkStatus.javaClass.simpleName) }
 
         LaunchedEffect(networkStatus) {
-            if (networkStatus == ConnectionStatus.Unavailable && previousNetworkStatus == ConnectionStatus.Available) {
+            if (networkStatus == ConnectionStatus.Unavailable && previousNetworkStatusString.value == ConnectionStatus.Available.javaClass.simpleName) {
                 wasOffline = true
                 navController.navigate("offline") {
                     popUpTo(navController.graph.findStartDestination().id) {
@@ -112,7 +124,7 @@ fun AppNav() {
                 }
                 wasOffline = false
             }
-            previousNetworkStatus = networkStatus
+            previousNetworkStatusString.value = networkStatus.javaClass.simpleName
         }
 
         val musicViewModel: com.example.DhoonHub.viewmodel.MusicViewModel = viewModel(
