@@ -27,9 +27,20 @@ import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.example.DhoonHub.model.Song
+import androidx.navigation.NavController
+import com.example.DhoonHub.viewmodel.MusicViewModel
+import com.example.DhoonHub.player.DhoonHubService
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
+import com.example.DhoonHub.ui.components.MiniPlayer
 
 @Composable
-fun OfflineScreen(songs: List<Song>, onSongClick: (Song) -> Unit, onDeleteSong: (Song) -> Unit) {
+fun OfflineScreen(musicViewModel: MusicViewModel, rootNav: NavController) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val songs by musicViewModel.offlineSongs.collectAsState()
+
     var searchQuery by remember { mutableStateOf("") }
     val filteredSongs = if (searchQuery.isEmpty()) {
         songs
@@ -139,13 +150,27 @@ fun OfflineScreen(songs: List<Song>, onSongClick: (Song) -> Unit, onDeleteSong: 
                     items(filteredSongs) { song ->
                         OfflineSongItem(
                             song = song, 
-                            onClick = { onSongClick(song) },
-                            onDelete = { onDeleteSong(song) }
+                            onClick = { 
+                                DhoonHubService.startPlayFile(context, song)
+                                rootNav.navigate("player")
+                            },
+                            onDelete = { 
+                                coroutineScope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        musicViewModel.musicRepository.deleteDownloadedSong(song)
+                                    }
+                                    musicViewModel.loadOfflineSongs()
+                                }
+                            }
                         )
                     }
                 }
             }
             }
+            MiniPlayer(
+                navController = rootNav,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
     }
 }

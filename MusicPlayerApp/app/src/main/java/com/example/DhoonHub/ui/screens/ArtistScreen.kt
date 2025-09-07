@@ -24,6 +24,9 @@ import com.example.DhoonHub.viewmodel.MusicViewModel
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
 import com.example.DhoonHub.player.PlaybackUiState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.foundation.layout.fillMaxWidth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,8 +37,17 @@ fun ArtistScreen(
     playbackState: PlaybackUiState
 ) {
     val context = LocalContext.current
+    val listState = rememberLazyListState()
+
     LaunchedEffect(artistName) {
         musicViewModel.loadArtistSongs(artistName)
+    }
+
+    LaunchedEffect(listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index) {
+        val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+        if (lastVisibleItem != null && lastVisibleItem.index >= musicViewModel.artistSongs.size - 5) {
+            musicViewModel.loadMoreArtistSongs(artistName)
+        }
     }
 
     Scaffold(
@@ -48,7 +60,7 @@ fun ArtistScreen(
                 .fillMaxSize()
                 .padding(it)
         ) {
-            if (musicViewModel.isLoadingArtistSongs) {
+            if (musicViewModel.isLoadingArtistSongs && musicViewModel.artistSongs.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
@@ -56,6 +68,7 @@ fun ArtistScreen(
                 Text(text = "Error: ${musicViewModel.artistSongsError}")
             } else {
                 LazyColumn(
+                    state = listState,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -69,6 +82,18 @@ fun ArtistScreen(
                             )
                             rootNavController.navigate("player")
                         })
+                    }
+                    if (musicViewModel.isPaginatingArtistSongs) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        }
                     }
                 }
             }

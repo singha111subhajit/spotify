@@ -93,5 +93,5 @@ interface MusicApi {
     suspend fun getArtistDetails(@Query("name") artistName: String): ArtistDetailsResponse
 
     @GET("/api/artist_songs/{artist_name}")
-    suspend fun getArtistSongs(@Path("artist_name") artistName: String): ArtistSongsResponse
+    suspend fun getArtistSongs(@Path("artist_name") artistName: String, @Query("page") page: Int? = null, @Query("per_page") perPage: Int? = null): ArtistSongsResponse
 }

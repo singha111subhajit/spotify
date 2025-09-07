@@ -52,7 +52,7 @@ fun HomeScreen(
     val albumGridState = rememberLazyGridState() // State for infinite scrolling
 
     var expanded by remember { mutableStateOf(false) }
-    var selectedType by remember { mutableStateOf("Albums") }
+    var selectedType by remember { mutableStateOf("Artists") }
     val types = listOf("Albums", "Artists")
 
     // Detect scroll to end for infinite scrolling

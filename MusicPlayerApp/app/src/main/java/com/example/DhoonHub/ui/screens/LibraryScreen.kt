@@ -29,8 +29,7 @@ fun LibraryScreen(
     var downloadingSongs by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selectedSongIds by remember { mutableStateOf<Set<String>>(emptySet()) }
 
-    // Offline songs are managed by the ViewModel
-    val offlineSongs = musicViewModel.offlineSongs
+    val offlineSongs by musicViewModel.offlineSongs.collectAsState()
 
     fun refreshOfflineSongs() {
         musicViewModel.loadOfflineSongs()
@@ -104,21 +103,7 @@ fun LibraryScreen(
             }
 
             when (currentTab) {
-                0 -> OfflineScreen(
-                    songs = offlineSongs,
-                    onSongClick = { song ->
-                        DhoonHubService.startPlayFile(context, song)
-                        rootNav.navigate("player")
-                    },
-                    onDeleteSong = { song ->
-                        coroutineScope.launch {
-                            withContext(Dispatchers.IO) {
-                                musicViewModel.musicRepository.deleteDownloadedSong(song)
-                            }
-                            refreshOfflineSongs()
-                        }
-                    }
-                )
+                0 -> OfflineScreen(musicViewModel = musicViewModel, rootNav = rootNav)
                 1 -> OnlineScreen(
                     onlineSongs = musicViewModel.onlineSongs,
                     searchResults = musicViewModel.searchResults,

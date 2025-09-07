@@ -25,42 +25,42 @@ class AuthRepository(context: Context) {
         private const val RETRY_DELAY_MS = 1000L
     }
 
-    suspend fun login(userId: String, password: String): NetworkResult<AuthResponse> {
+    suspend fun login(request: LoginRequest): NetworkResult<AuthResponse> {
         // Validate input
-        if (!ValidationUtils.isValidEmail(userId)) {
+        if (!ValidationUtils.isValidEmail(request.user_id)) {
             return NetworkResult.Error("Please enter a valid email address")
         }
         
-        val passwordValidation = ValidationUtils.isValidPassword(password)
+        val passwordValidation = ValidationUtils.isValidPassword(request.password)
         if (passwordValidation is ValidationUtils.ValidationResult.Error) {
             return NetworkResult.Error(passwordValidation.message)
         }
 
         return executeWithRetry {
-            val response = authApi.login(LoginRequest(user_id = userId, password = password))
+            val response = authApi.login(request)
             tokenStorage.setToken(response.token)
             NetworkResult.Success(response)
         }
     }
 
-    suspend fun register(username: String, userId: String, password: String): NetworkResult<AuthResponse> {
+    suspend fun register(request: RegisterRequest): NetworkResult<AuthResponse> {
         // Validate input
-        val usernameValidation = ValidationUtils.isValidUsername(username)
+        val usernameValidation = ValidationUtils.isValidUsername(request.username)
         if (usernameValidation is ValidationUtils.ValidationResult.Error) {
             return NetworkResult.Error(usernameValidation.message)
         }
         
-        if (!ValidationUtils.isValidEmail(userId)) {
+        if (!ValidationUtils.isValidEmail(request.user_id)) {
             return NetworkResult.Error("Please enter a valid email address")
         }
         
-        val passwordValidation = ValidationUtils.isValidPassword(password)
+        val passwordValidation = ValidationUtils.isValidPassword(request.password)
         if (passwordValidation is ValidationUtils.ValidationResult.Error) {
             return NetworkResult.Error(passwordValidation.message)
         }
 
         return executeWithRetry {
-            val response = authApi.register(RegisterRequest(username = username, user_id = userId, password = password))
+            val response = authApi.register(request)
             tokenStorage.setToken(response.token)
             NetworkResult.Success(response)
         }

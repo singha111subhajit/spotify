@@ -27,25 +27,29 @@ import com.example.DhoonHub.ui.components.LoadingButton
 import com.example.DhoonHub.utils.NetworkResult
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.DhoonHub.viewmodel.AuthViewModel
+import com.example.DhoonHub.storage.TokenStorage
+import com.example.DhoonHub.model.LoginRequest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(nav: NavController) {
+fun LoginScreen(nav: NavController, authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.Factory(AuthRepository(LocalContext.current), TokenStorage.getInstance(LocalContext.current)))) {
     val context = LocalContext.current
-    val repo = remember { AuthRepository(context) }
     val focusManager = LocalFocusManager.current
     
     var userId by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    
+    val loginResult by authViewModel.loginResult.collectAsState()
+    
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     
-    val scope = rememberCoroutineScope()
-
     // Check if user is already logged in
     LaunchedEffect(Unit) {
-        if (repo.isLoggedIn()) {
+        if (TokenStorage.getInstance(context).getToken() != null) {
             nav.navigate("main") { 
                 popUpTo("login") { inclusive = true } 
             }
@@ -59,33 +63,34 @@ fun LoginScreen(nav: NavController) {
         }
     }
 
+    LaunchedEffect(loginResult) {
+        when (loginResult) {
+            is NetworkResult.Loading -> {
+                isLoading = true
+                error = null
+            }
+            is NetworkResult.Success -> {
+                isLoading = false
+                nav.navigate("main") {
+                    popUpTo("login") { inclusive = true }
+                }
+            }
+            is NetworkResult.Error -> {
+                isLoading = false
+                error = (loginResult as NetworkResult.Error).message
+            }
+            else -> {
+                isLoading = false
+            }
+        }
+    }
+
     fun performLogin() {
         if (userId.isBlank() || password.isBlank()) {
             error = "Please fill in all fields"
             return
         }
-        
-        isLoading = true
-        error = null
-        
-        scope.launch {
-            repo.login(userId.trim(), password).let { result ->
-                when (result) {
-                    is NetworkResult.Success -> {
-                        nav.navigate("main") { 
-                            popUpTo("login") { inclusive = true } 
-                        }
-                    }
-                    is NetworkResult.Error -> {
-                        error = result.message
-                    }
-                    is NetworkResult.Loading -> {
-                        // Handle loading state if needed
-                    }
-                }
-                isLoading = false
-            }
-        }
+        authViewModel.login(LoginRequest(userId.trim(), password))
     }
 
     Box(

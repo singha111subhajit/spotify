@@ -17,6 +17,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+
 class MusicViewModel(private val context: Context) : ViewModel() {
 
     private var searchJob: Job? = null
@@ -44,8 +47,8 @@ class MusicViewModel(private val context: Context) : ViewModel() {
         private set
     
     // Offline songs state
-    var offlineSongs by mutableStateOf<List<Song>>(emptyList())
-        private set
+    private val _offlineSongs = MutableStateFlow<List<Song>>(emptyList())
+    val offlineSongs: StateFlow<List<Song>> = _offlineSongs
     var isLoadingOfflineSongs by mutableStateOf(false)
         private set
     
@@ -94,6 +97,12 @@ class MusicViewModel(private val context: Context) : ViewModel() {
     var isLoadingArtistSongs by mutableStateOf(false)
         private set
     var artistSongsError by mutableStateOf<String?>(null)
+        private set
+    var isPaginatingArtistSongs by mutableStateOf(false)
+        private set
+    var canLoadMoreArtistSongs by mutableStateOf(true)
+        private set
+    var currentArtistSongPage by mutableStateOf(1)
         private set
     
     // Album details
@@ -192,7 +201,7 @@ class MusicViewModel(private val context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 val offlineFiles = musicRepository.getOfflineSongsWithMetadata()
-                offlineSongs = offlineFiles
+                _offlineSongs.value = offlineFiles
             } catch (e: Exception) {
                 // Handle error
             } finally {
@@ -217,7 +226,7 @@ class MusicViewModel(private val context: Context) : ViewModel() {
                 if (fetchedSongs.isNotEmpty()) {
                     onlineSongs = if (page == 1) fetchedSongs else onlineSongs + fetchedSongs
                     currentOnlineSongPage = page
-                    canLoadMoreOnlineSongs = fetchedSongs.size == 10 // Assuming 10 per page
+                    canLoadMoreOnlineSongs = fetchedSongs.size == 20 // Corrected to 20 per page
                 } else {
                     canLoadMoreOnlineSongs = false
                 }
@@ -341,7 +350,7 @@ class MusicViewModel(private val context: Context) : ViewModel() {
         // Force refresh all data
         albums = emptyList()
         onlineSongs = emptyList()
-        offlineSongs = emptyList()
+        _offlineSongs.value = emptyList()
         albumSongsCache.clear()
         currentAlbumPage = 1 // Reset pagination
         canLoadMoreAlbums = true // Reset pagination
@@ -419,17 +428,39 @@ class MusicViewModel(private val context: Context) : ViewModel() {
         return artist
     }
 
-    fun loadArtistSongs(artistName: String) {
-        isLoadingArtistSongs = true
-        artistSongsError = null
+    fun loadArtistSongs(artistName: String, page: Int = 1, perPage: Int = 10) {
+        if (isLoadingArtistSongs || isPaginatingArtistSongs || !canLoadMoreArtistSongs) return
+
+        if (page == 1) {
+            isLoadingArtistSongs = true
+            artistSongsError = null
+        } else {
+            isPaginatingArtistSongs = true
+        }
+
         viewModelScope.launch {
             try {
-                artistSongs = musicRepository.getArtistSongs(artistName)
+                val fetchedSongs = musicRepository.getArtistSongs(artistName, page, perPage)
+                if (fetchedSongs.isNotEmpty()) {
+                    artistSongs = if (page == 1) fetchedSongs else artistSongs + fetchedSongs
+                    currentArtistSongPage = page
+                    canLoadMoreArtistSongs = fetchedSongs.size == perPage
+                } else {
+                    canLoadMoreArtistSongs = false
+                }
             } catch (e: Exception) {
                 artistSongsError = "Failed to load artist songs: ${e.message}"
+                canLoadMoreArtistSongs = false
             } finally {
                 isLoadingArtistSongs = false
+                isPaginatingArtistSongs = false
             }
+        }
+    }
+
+    fun loadMoreArtistSongs(artistName: String) {
+        if (canLoadMoreArtistSongs && !isLoadingArtistSongs && !isPaginatingArtistSongs) {
+            loadArtistSongs(artistName, page = currentArtistSongPage + 1)
         }
     }
 
