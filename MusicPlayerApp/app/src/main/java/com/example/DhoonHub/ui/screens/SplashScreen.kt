@@ -17,6 +17,7 @@ import com.example.DhoonHub.utils.NetworkConnectivityObserver
 import com.example.DhoonHub.utils.NetworkUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import android.util.Log
 
 @Composable
 fun SplashScreen(navController: NavController) {
@@ -31,17 +32,23 @@ fun SplashScreen(navController: NavController) {
 
     LaunchedEffect(Unit) {
         val networkStatus = NetworkConnectivityObserver(context).observe().first()
+        val token = com.example.DhoonHub.storage.TokenStorage.getInstance(context).getToken()
+        Log.d("SplashScreen", "Network Status: $networkStatus, Token: $token")
+
         if (networkStatus == ConnectionStatus.Available) {
-            if (com.example.DhoonHub.storage.TokenStorage.getInstance(context).getToken() != null) {
+            if (token != null) {
+                Log.d("SplashScreen", "Navigating to main (token exists)")
                 navController.navigate("main") {
                     popUpTo("splash") { inclusive = true }
                 }
             } else {
+                Log.d("SplashScreen", "Navigating to login (no token)")
                 navController.navigate("login") {
                     popUpTo("splash") { inclusive = true }
                 }
             }
         } else {
+            Log.d("SplashScreen", "Navigating to offline (no network)")
             navController.navigate("offline") {
                 popUpTo("splash") { inclusive = true }
             }
