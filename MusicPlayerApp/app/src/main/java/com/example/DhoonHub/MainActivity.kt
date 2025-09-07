@@ -80,9 +80,10 @@ fun AppNav() {
         }.collectAsState(initial = ConnectionStatus.Unavailable)
 
         var wasOffline by rememberSaveable { mutableStateOf(false) }
+        var previousNetworkStatus by rememberSaveable { mutableStateOf(networkStatus) }
 
         LaunchedEffect(networkStatus) {
-            if (networkStatus == ConnectionStatus.Unavailable) {
+            if (networkStatus == ConnectionStatus.Unavailable && previousNetworkStatus == ConnectionStatus.Available) {
                 wasOffline = true
                 navController.navigate("offline") {
                     popUpTo(navController.graph.findStartDestination().id) {
@@ -111,6 +112,7 @@ fun AppNav() {
                 }
                 wasOffline = false
             }
+            previousNetworkStatus = networkStatus
         }
 
         val musicViewModel: com.example.DhoonHub.viewmodel.MusicViewModel = viewModel(
