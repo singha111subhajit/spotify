@@ -3,6 +3,7 @@ package com.example.DhoonHub.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -13,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.DhoonHub.repository.AuthRepository
 import com.example.DhoonHub.storage.SettingsStorage
+import android.widget.Toast
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -20,6 +22,10 @@ fun ProfileScreen(rootNav: NavController) {
     val context = LocalContext.current
     val authRepo = remember { AuthRepository(context) }
     val settings = remember { SettingsStorage.getInstance(context) }
+
+    var currentUsername by remember { mutableStateOf(authRepo.getUsername() ?: "DhoonHub User") }
+    var editableUsername by remember { mutableStateOf(currentUsername) }
+    var isEditing by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -63,11 +69,40 @@ fun ProfileScreen(rootNav: NavController) {
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text(
-                            text = "DhoonHub User",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold
-                        )
+                        if (isEditing) {
+                            OutlinedTextField(
+                                value = editableUsername,
+                                onValueChange = { editableUsername = it },
+                                label = { Text("Username") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(onClick = {
+                                if (editableUsername.isNotBlank()) {
+                                    authRepo.updateUsername(editableUsername)
+                                    currentUsername = editableUsername
+                                    isEditing = false
+                                    Toast.makeText(context, "Username updated!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "Username cannot be empty", Toast.LENGTH_SHORT).show()
+                                }
+                            }) {
+                                Text("Save")
+                            }
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = currentUsername,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                IconButton(onClick = { isEditing = true }) {
+                                    Icon(Icons.Default.Edit, contentDescription = "Edit Username")
+                                }
+                            }
+                        }
                         Text(
                             text = "Music Lover",
                             style = MaterialTheme.typography.bodyMedium,

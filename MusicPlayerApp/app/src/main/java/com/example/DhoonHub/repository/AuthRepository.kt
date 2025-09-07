@@ -39,6 +39,7 @@ class AuthRepository(context: Context) {
         return executeWithRetry {
             val response = authApi.login(request)
             tokenStorage.setToken(response.token)
+            tokenStorage.setUsername(request.user_id) // Save username on login
             NetworkResult.Success(response)
         }
     }
@@ -62,6 +63,7 @@ class AuthRepository(context: Context) {
         return executeWithRetry {
             val response = authApi.register(request)
             tokenStorage.setToken(response.token)
+            tokenStorage.setUsername(request.username) // Save username on register
             NetworkResult.Success(response)
         }
     }
@@ -76,6 +78,12 @@ class AuthRepository(context: Context) {
     }
 
     fun isLoggedIn(): Boolean = !tokenStorage.getToken().isNullOrBlank()
+
+    fun getUsername(): String? = tokenStorage.getUsername()
+
+    fun updateUsername(newUsername: String) {
+        tokenStorage.setUsername(newUsername)
+    }
     
     private suspend fun <T> executeWithRetry(
         maxAttempts: Int = MAX_RETRY_ATTEMPTS,

@@ -24,6 +24,7 @@ fun RegisterScreen(nav: NavController, authViewModel: AuthViewModel = viewModel(
     var username by remember { mutableStateOf("") }
     var userId by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
     
     val registerResult by authViewModel.registerResult.collectAsState()
 
@@ -58,10 +59,15 @@ fun RegisterScreen(nav: NavController, authViewModel: AuthViewModel = viewModel(
             OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username") })
             OutlinedTextField(value = userId, onValueChange = { userId = it }, label = { Text("User ID") })
             OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, visualTransformation = PasswordVisualTransformation())
+            OutlinedTextField(value = confirmPassword, onValueChange = { confirmPassword = it }, label = { Text("Confirm Password") }, visualTransformation = PasswordVisualTransformation())
             if (error != null) Text(text = error!!, color = MaterialTheme.colorScheme.error)
             LoadingButton(onClick = {
-                if (username.isBlank() || userId.isBlank() || password.isBlank()) {
+                if (username.isBlank() || userId.isBlank() || password.isBlank() || confirmPassword.isBlank()) {
                     error = "Please fill in all fields"
+                    return@LoadingButton
+                }
+                if (password != confirmPassword) {
+                    error = "Passwords do not match"
                     return@LoadingButton
                 }
                 authViewModel.register(RegisterRequest(username, userId.trim(), password))
