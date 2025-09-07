@@ -38,6 +38,9 @@ class AuthRepository(context: Context) {
 
         return executeWithRetry {
             val response = authApi.login(request)
+            if (response.token == null) {
+                return@executeWithRetry NetworkResult.Error("Authentication failed: No token received from server.")
+            }
             tokenStorage.setToken(response.token)
             tokenStorage.setUsername(request.user_id) // Save username on login
             NetworkResult.Success(response)
@@ -62,9 +65,9 @@ class AuthRepository(context: Context) {
 
         return executeWithRetry {
             val response = authApi.register(request)
-            tokenStorage.setToken(response.token)
-            tokenStorage.setUsername(request.username) // Save username on register
-            NetworkResult.Success(response)
+            // No token from register, so we log in immediately after successful registration
+            val loginRequest = LoginRequest(request.user_id, request.password)
+            login(loginRequest) // Call the login function
         }
     }
 
