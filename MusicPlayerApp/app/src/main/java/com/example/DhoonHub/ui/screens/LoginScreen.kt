@@ -47,15 +47,6 @@ fun LoginScreen(nav: NavController, authViewModel: AuthViewModel = viewModel(fac
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     
-    // Check if user is already logged in
-    LaunchedEffect(Unit) {
-        if (TokenStorage.getInstance(context).getToken() != null) {
-            nav.navigate("main") { 
-                popUpTo("login") { inclusive = true } 
-            }
-        }
-    }
-
     // Clear error when user starts typing
     LaunchedEffect(userId, password) {
         if (error != null) {
