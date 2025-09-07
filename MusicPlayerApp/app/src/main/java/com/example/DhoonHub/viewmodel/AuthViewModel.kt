@@ -21,12 +21,23 @@ class AuthViewModel(private val authRepository: AuthRepository, private val toke
     private val _registerResult = MutableStateFlow<NetworkResult<Unit>>(NetworkResult.Idle())
     val registerResult: StateFlow<NetworkResult<Unit>> = _registerResult
 
+    private val _isAuthenticated = MutableStateFlow(tokenStorage.getToken() != null)
+    val isAuthenticated: StateFlow<Boolean> = _isAuthenticated
+
+    fun logout() {
+        viewModelScope.launch {
+            tokenStorage.clear()
+            _isAuthenticated.value = false
+        }
+    }
+
     fun login(loginRequest: LoginRequest) {
         viewModelScope.launch {
             _loginResult.value = NetworkResult.Loading()
             when (val response = authRepository.login(loginRequest)) {
                 is NetworkResult.Success -> {
                     tokenStorage.setToken(response.data.token)
+                    _isAuthenticated.value = true
                     _loginResult.value = NetworkResult.Success(Unit)
                 }
                 is NetworkResult.Error -> {

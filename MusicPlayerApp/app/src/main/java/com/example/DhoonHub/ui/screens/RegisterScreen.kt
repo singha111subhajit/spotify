@@ -39,7 +39,7 @@ fun RegisterScreen(nav: NavController, authViewModel: AuthViewModel = viewModel(
             }
             is NetworkResult.Success -> {
                 isLoading = false
-                nav.navigate("main") {
+                nav.navigate("login") { // Changed from "main" to "login"
                     popUpTo("register") { inclusive = true }
                 }
             }

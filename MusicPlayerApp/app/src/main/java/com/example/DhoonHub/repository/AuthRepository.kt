@@ -64,7 +64,6 @@ class AuthRepository(context: Context) {
         }
 
         return executeWithRetry {
-            val response = authApi.register(request)
             // No token from register, so we log in immediately after successful registration
             val loginRequest = LoginRequest(request.user_id, request.password)
             login(loginRequest) // Call the login function

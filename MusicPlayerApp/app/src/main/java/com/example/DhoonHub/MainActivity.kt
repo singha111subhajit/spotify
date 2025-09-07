@@ -1,4 +1,3 @@
-
 package com.example.DhoonHub
 
 import android.Manifest
@@ -80,19 +79,20 @@ fun AppNav() {
             NetworkConnectivityObserver(context).observe()
         }.collectAsState(initial = ConnectionStatus.Unavailable)
 
-        val ConnectionStatusSaver = Saver<ConnectionStatus, String>(
-            save = { status -> status.javaClass.simpleName },
-            restore = {
-                when (it) {
-                    "Available" -> ConnectionStatus.Available
-                    "Unavailable" -> ConnectionStatus.Unavailable
-                    else -> ConnectionStatus.Unavailable // Default or error case
-                }
-            }
-        )
-
         var wasOffline by rememberSaveable { mutableStateOf(false) }
         val previousNetworkStatusString = rememberSaveable { mutableStateOf(networkStatus.javaClass.simpleName) }
+
+        val musicViewModel: com.example.DhoonHub.viewmodel.MusicViewModel = viewModel(
+            factory = com.example.DhoonHub.viewmodel.MusicViewModel.Factory(context)
+        )
+
+        val authRepository = com.example.DhoonHub.repository.AuthRepository(context)
+        val tokenStorage = com.example.DhoonHub.storage.TokenStorage.getInstance(context)
+        val authViewModel: com.example.DhoonHub.viewmodel.AuthViewModel = viewModel(
+            factory = com.example.DhoonHub.viewmodel.AuthViewModel.Factory(authRepository, tokenStorage)
+        )
+
+        val isAuthenticated by authViewModel.isAuthenticated.collectAsState()
 
         LaunchedEffect(networkStatus) {
             if (networkStatus == ConnectionStatus.Unavailable && previousNetworkStatusString.value == ConnectionStatus.Available.javaClass.simpleName) {
@@ -127,15 +127,15 @@ fun AppNav() {
             previousNetworkStatusString.value = networkStatus.javaClass.simpleName
         }
 
-        val musicViewModel: com.example.DhoonHub.viewmodel.MusicViewModel = viewModel(
-            factory = com.example.DhoonHub.viewmodel.MusicViewModel.Factory(context)
-        )
-
-        val authRepository = com.example.DhoonHub.repository.AuthRepository(context)
-        val tokenStorage = com.example.DhoonHub.storage.TokenStorage.getInstance(context)
-        val authViewModel: com.example.DhoonHub.viewmodel.AuthViewModel = viewModel(
-            factory = com.example.DhoonHub.viewmodel.AuthViewModel.Factory(authRepository, tokenStorage)
-        )
+        LaunchedEffect(isAuthenticated) {
+            if (!isAuthenticated) {
+                navController.navigate("login") {
+                    popUpTo("login") {
+                        inclusive = true
+                    }
+                }
+            }
+        }
 
         Surface(color = MaterialTheme.colorScheme.background) {
             Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { paddingValues ->
@@ -145,7 +145,7 @@ fun AppNav() {
                         composable("offline") { OfflineScreen(musicViewModel = musicViewModel, rootNav = navController) }
                         composable("login") { LoginScreen(navController, authViewModel) }
                         composable("register") { RegisterScreen(navController, authViewModel) }
-                        composable("main") { MainScaffold(rootNavController = navController, musicViewModel = musicViewModel) }
+                        composable("main") { MainScaffold(rootNavController = navController, musicViewModel = musicViewModel, authViewModel = authViewModel) }
                         composable("player") { PlayerScreen(navController) }
                         composable(
                             route = "album/{albumName}",

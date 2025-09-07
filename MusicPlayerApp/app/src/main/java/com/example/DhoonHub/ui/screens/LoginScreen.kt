@@ -35,7 +35,6 @@ import com.example.DhoonHub.model.LoginRequest
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(nav: NavController, authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.Factory(AuthRepository(LocalContext.current), TokenStorage.getInstance(LocalContext.current)))) {
-    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     
     var userId by remember { mutableStateOf("") }

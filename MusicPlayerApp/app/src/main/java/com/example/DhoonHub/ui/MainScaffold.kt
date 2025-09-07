@@ -1,4 +1,3 @@
-
 package com.example.DhoonHub.ui
 
 import androidx.compose.foundation.layout.Box
@@ -48,6 +47,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.DhoonHub.repository.AuthRepository
 import com.example.DhoonHub.storage.SettingsStorage
+import androidx.compose.foundation.layout.fillMaxSize // Added import
 
 sealed class Screen(val route: String, val icon: ImageVector, val label: String) {
     object Home : Screen("home", Icons.Default.Home, "Home")
@@ -61,7 +61,8 @@ sealed class Screen(val route: String, val icon: ImageVector, val label: String)
 @Composable
 fun MainScaffold(
     rootNavController: NavController,
-    musicViewModel: MusicViewModel
+    musicViewModel: MusicViewModel,
+    authViewModel: com.example.DhoonHub.viewmodel.AuthViewModel
 ) {
     val navController = rememberNavController()
     val screens = listOf(
@@ -89,6 +90,8 @@ fun MainScaffold(
 
     var userPreferredOfflineMode by rememberSaveable { mutableStateOf(settings.getOfflineMode()) }
 
+    val isAuthenticated by authViewModel.isAuthenticated.collectAsState()
+
     LaunchedEffect(isOnline, userPreferredOfflineMode) {
         if (!isOnline) { // Actual network is down
             navController.navigate(Screen.Offline.route) {
@@ -113,162 +116,171 @@ fun MainScaffold(
         }
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet {
-                Text("DhoonHub Menu", modifier = Modifier.padding(16.dp))
-                HorizontalDivider()
-                NavigationDrawerItem(
-                    label = { Text(if (userPreferredOfflineMode) "Go Online" else "Go Offline") },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        userPreferredOfflineMode = !userPreferredOfflineMode
-                        settings.setOfflineMode(userPreferredOfflineMode)
-
-                        if (userPreferredOfflineMode) {
-                            navController.navigate(Screen.Offline.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    inclusive = true
-                                }
-                            }
-                        } else {
-                            navController.navigate(Screen.Home.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    inclusive = true
-                                }
-                            }
-                        }
-                    },
-                    icon = {
-                        Icon(
-                            imageVector = if (userPreferredOfflineMode) Icons.Default.Home else Icons.AutoMirrored.Filled.ExitToApp,
-                            contentDescription = if (userPreferredOfflineMode) "Go Online" else "Go Offline"
-                        )
-                    }
-                )
-            }
+    if (!isAuthenticated) {
+        // If not authenticated, display an empty box or a loading indicator
+        // MainActivity's LaunchedEffect will handle navigation to login
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Optionally show a loading indicator or a message
+            // CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         }
-    ) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("") },
-                    navigationIcon = {
-                        IconButton(onClick = {
-                            scope.launch { drawerState.open() }
-                        }) {
-                            Icon(Icons.Filled.Menu, contentDescription = "Menu")
-                        }
-                    },
-                    actions = {
-                        // Language selection dropdown
-                        IconButton(onClick = { expandedLanguageMenu = true }) {
-                            Icon(Icons.Default.Settings, contentDescription = "Select Language")
-                        }
-                        DropdownMenu(
-                            expanded = expandedLanguageMenu,
-                            onDismissRequest = { expandedLanguageMenu = false }
-                        ) {
-                            languages.forEach { lang ->
-                                DropdownMenuItem(
-                                    text = { Text(lang) },
-                                    onClick = {
-                                        selectedLanguage = lang
-                                        settings.setLanguage(lang)
-                                        expandedLanguageMenu = false
-                                        Toast.makeText(context, "Language set to $lang", Toast.LENGTH_SHORT).show()
-                                    }
-                                )
-                            }
-                        }
+    } else {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet {
+                    Text("DhoonHub Menu", modifier = Modifier.padding(16.dp))
+                    HorizontalDivider()
+                    NavigationDrawerItem(
+                        label = { Text(if (userPreferredOfflineMode) "Go Online" else "Go Offline") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            userPreferredOfflineMode = !userPreferredOfflineMode
+                            settings.setOfflineMode(userPreferredOfflineMode)
 
-                        // Clear Cache dropdown
-                        IconButton(onClick = { showMenu = !showMenu }) {
-                            Icon(Icons.Filled.MoreVert, contentDescription = "More options")
+                            if (userPreferredOfflineMode) {
+                                navController.navigate(Screen.Offline.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        inclusive = true
+                                    }
+                                }
+                            } else {
+                                navController.navigate(Screen.Home.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        inclusive = true
+                                    }
+                                }
+                            }
+                        },
+                        icon = {
+                            Icon(
+                                imageVector = if (userPreferredOfflineMode) Icons.Default.Home else Icons.AutoMirrored.Filled.ExitToApp,
+                                contentDescription = if (userPreferredOfflineMode) "Go Online" else "Go Offline"
+                            )
                         }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Clear Server Cache") },
-                                onClick = {
-                                    showMenu = false
-                                    scope.launch {
-                                        try {
-                                            val response = musicViewModel.clearAlbumsCache()
-                                            Toast.makeText(context, response, Toast.LENGTH_SHORT).show()
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, "Error clearing cache: ${e.message}", Toast.LENGTH_LONG).show()
+                    )
+                }
+            }
+        ) {
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = { Text("") },
+                        navigationIcon = {
+                            IconButton(onClick = {
+                                scope.launch { drawerState.open() }
+                            }) {
+                                Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                            }
+                        },
+                        actions = {
+                            // Language selection dropdown
+                            IconButton(onClick = { expandedLanguageMenu = true }) {
+                                Icon(Icons.Default.Settings, contentDescription = "Select Language")
+                            }
+                            DropdownMenu(
+                                expanded = expandedLanguageMenu,
+                                onDismissRequest = { expandedLanguageMenu = false }
+                            ) {
+                                languages.forEach { lang ->
+                                    DropdownMenuItem(
+                                        text = { Text(lang) },
+                                        onClick = {
+                                            selectedLanguage = lang
+                                            settings.setLanguage(lang)
+                                            expandedLanguageMenu = false
+                                            Toast.makeText(context, "Language set to $lang", Toast.LENGTH_SHORT).show()
+                                        }
+                                    )
+                                }
+                            }
+
+                            // Clear Cache dropdown
+                            IconButton(onClick = { showMenu = !showMenu }) {
+                                Icon(Icons.Filled.MoreVert, contentDescription = "More options")
+                            }
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Clear Server Cache") },
+                                    onClick = {
+                                        showMenu = false
+                                        scope.launch {
+                                            try {
+                                                val response = musicViewModel.clearAlbumsCache()
+                                                Toast.makeText(context, response, Toast.LENGTH_SHORT).show()
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Error clearing cache: ${e.message}", Toast.LENGTH_LONG).show()
+                                            }
                                         }
                                     }
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Clear Artist Cache") },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Clear Artist Cache") },
+                                    onClick = {
+                                        showMenu = false
+                                        musicViewModel.clearArtistCache()
+                                        Toast.makeText(context, "Artist cache cleared", Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+                            }
+                        }
+                    )
+                },
+                bottomBar = {
+                    NavigationBar {
+                        screens.forEach { screen ->
+                            NavigationBarItem(
+                                icon = {
+                                    Icon(
+                                        imageVector = screen.icon,
+                                        contentDescription = screen.label
+                                    )
+                                },
+                                label = { Text(screen.label) },
+                                selected = currentRoute == screen.route,
                                 onClick = {
-                                    showMenu = false
-                                    musicViewModel.clearArtistCache()
-                                    Toast.makeText(context, "Artist cache cleared", Toast.LENGTH_SHORT).show()
+                                    navController.navigate(screen.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
                                 }
                             )
                         }
                     }
-                )
-            },
-            bottomBar = {
-                NavigationBar {
-                    screens.forEach { screen ->
-                        NavigationBarItem(
-                            icon = {
-                                Icon(
-                                    imageVector = screen.icon,
-                                    contentDescription = screen.label
-                                )
-                            },
-                            label = { Text(screen.label) },
-                            selected = currentRoute == screen.route,
-                            onClick = {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            }
-                        )
-                    }
                 }
-            }
-        ) { innerPadding ->
-            Box(modifier = Modifier.padding(innerPadding)) {
-                NavHost(
-                    navController = navController,
-                    startDestination = Screen.Home.route
-                ) {
-                    composable(Screen.Home.route) { HomeScreen(navController, rootNavController, musicViewModel) }
-                    composable(Screen.Search.route) { SearchScreen(rootNavController, musicViewModel) }
-                    composable(Screen.Library.route) { LibraryScreen(rootNavController, musicViewModel) }
-                    composable(Screen.Profile.route) { ProfileScreen(rootNavController) }
-                    composable(Screen.Offline.route) { OfflineScreen(musicViewModel = musicViewModel, rootNav = rootNavController) }
-                    composable("album/{albumName}") { backStackEntry ->
-                        val albumName = backStackEntry.arguments?.getString("albumName") ?: ""
-                        AlbumScreen(navController = navController, rootNavController = rootNavController, albumName = albumName, musicViewModel = musicViewModel)
+            ) { innerPadding ->
+                Box(modifier = Modifier.padding(innerPadding)) {
+                    NavHost(
+                        navController = navController,
+                        startDestination = Screen.Home.route
+                    ) {
+                        composable(Screen.Home.route) { HomeScreen(navController, rootNavController, musicViewModel) }
+                        composable(Screen.Search.route) { SearchScreen(rootNavController, musicViewModel) }
+                        composable(Screen.Library.route) { LibraryScreen(rootNavController, musicViewModel) }
+                        composable(Screen.Profile.route) { ProfileScreen(rootNavController, authViewModel) }
+                        composable(Screen.Offline.route) { OfflineScreen(musicViewModel = musicViewModel, rootNav = rootNavController) }
+                        composable("album/{albumName}") { backStackEntry ->
+                            val albumName = backStackEntry.arguments?.getString("albumName") ?: ""
+                            AlbumScreen(navController = navController, rootNavController = rootNavController, albumName = albumName, musicViewModel = musicViewModel)
+                        }
+                        composable("artist/{artistName}") { backStackEntry ->
+                            val artistName = backStackEntry.arguments?.getString("artistName") ?: ""
+                            ArtistScreen(artistName = artistName, rootNavController = rootNavController, musicViewModel = musicViewModel, playbackState = PlaybackStateHolder.uiState.collectAsState().value)
+                        }
                     }
-                    composable("artist/{artistName}") { backStackEntry ->
-                        val artistName = backStackEntry.arguments?.getString("artistName") ?: ""
-                        ArtistScreen(artistName = artistName, rootNavController = rootNavController, musicViewModel = musicViewModel, playbackState = PlaybackStateHolder.uiState.collectAsState().value)
-                    }
-                }
 
-                // Add MiniPlayer at the bottom
-                MiniPlayer(
-                    navController = rootNavController,
-                    modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
-                )
+                    // Add MiniPlayer at the bottom
+                    MiniPlayer(
+                        navController = rootNavController,
+                        modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
+                    )
+                }
             }
         }
     }

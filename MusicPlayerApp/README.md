@@ -11,7 +11,7 @@ release of the apk link >https://github.com/singha111subhajit/dhoonhub-apk/relea
 we can get a crash_report :
 Filter logs only for your app.
 Capture only FATAL EXCEPTION (crashes).
-Save the crash trace to a file like crash_com.example.DhoonHub_20250907_084300.log.
+Save the crash trace to a file like crash_com.example.DhoonHub_20250907_084300.log
 we already have a get_crash_report.sh file just check the permision first 
 >>>
 chmod +x get_crash_report.sh
