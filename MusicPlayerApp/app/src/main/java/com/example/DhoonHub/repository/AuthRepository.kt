@@ -27,8 +27,8 @@ class AuthRepository(context: Context) {
 
     suspend fun login(request: LoginRequest): NetworkResult<AuthResponse> {
         // Validate input
-        if (!ValidationUtils.isValidEmail(request.user_id)) {
-            return NetworkResult.Error("Please enter a valid email address")
+        if (request.user_id.isBlank()) {
+            return NetworkResult.Error("Please enter a valid user ID")
         }
         
         val passwordValidation = ValidationUtils.isValidPassword(request.password)
@@ -54,8 +54,8 @@ class AuthRepository(context: Context) {
             return NetworkResult.Error(usernameValidation.message)
         }
         
-        if (!ValidationUtils.isValidEmail(request.user_id)) {
-            return NetworkResult.Error("Please enter a valid email address")
+        if (request.user_id.isBlank()) {
+            return NetworkResult.Error("Please enter a valid user ID")
         }
         
         val passwordValidation = ValidationUtils.isValidPassword(request.password)
@@ -64,9 +64,10 @@ class AuthRepository(context: Context) {
         }
 
         return executeWithRetry {
-            // No token from register, so we log in immediately after successful registration
+            authApi.register(request)
+            // Assuming successful registration, proceed to login
             val loginRequest = LoginRequest(request.user_id, request.password)
-            login(loginRequest) // Call the login function
+            login(loginRequest)
         }
     }
 
