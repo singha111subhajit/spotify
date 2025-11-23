@@ -375,7 +375,11 @@ function App() {
   useEffect(() => {
     if (currentSong && audioRef.current) {
       audioRef.current.pause();
-      audioRef.current.src = currentSong.url;
+      if (currentSong.source === 'jiosaavn' && currentSong.url.startsWith('http')) {
+        audioRef.current.src = `${API_BASE}/proxy/audio/${encodeURIComponent(currentSong.url)}`;
+      } else {
+        audioRef.current.src = currentSong.url;
+      }
       audioRef.current.load();
       if (isPlaying) {
         audioRef.current.play().catch(error => {

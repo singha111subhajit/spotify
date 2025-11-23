@@ -13,10 +13,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from functools import wraps
 from flask_migrate import Migrate
-from flask import request, jsonify
 from urllib.parse import quote
-import requests
-from bs4 import BeautifulSoup
+
 
 
 # Add these imports at the top of your file
@@ -32,8 +30,7 @@ SONGS_FOLDER = 'static/songs'
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg'}
 
 
-# JioSaavn API endpoint (unofficial public API)
-JIOSAAVN_API_BASE = 'https://saavn.dev/api'
+import jiosaavn
 
 # JWT secret key (should be in env in production)
 JWT_SECRET = 'supersecretkey'
@@ -325,195 +322,22 @@ def upgrade_url(url):
         return 'https://' + url[len('http://'):]
     return url
 
-# Add this constant at the top of your file, near JIOSAAVN_API_BASE
-JIOSAAVN_INTERNAL_PAGE_SIZE = 10 # Observed limit of JioSaavn /search/songs endpoint
 
 # --- JioSaavn API search ---
 def search_jiosaavn(query, page=1, per_page=20):
     """
-    Search for songs using the JioSaavn public API (unofficial).
-    Fetches enough internal pages to satisfy the requested per_page.
-    Returns a list of processed songs and the count of songs fetched.
+    Search for songs using the new local jiosaavn module.
     """
-    all_songs_from_jiosaavn = []
-    
-    # Calculate how many internal JioSaavn API pages we need to fetch
-    # to cover the requested 'per_page' for the current 'page'.
-    # We need to fetch from (page-1)*per_page + 1 to page*per_page
-    # If page=1, per_page=20, we need songs 1-20.
-    # If JioSaavn_internal_page_size is 10, we need JioSaavn pages 1 and 2.
-    # If page=2, per_page=20, we need songs 21-40.
-    # We need JioSaavn pages 3 and 4.
-
-    # Determine the starting internal page for JioSaavn API
-    # This is the first JioSaavn page that contains data for our requested 'page'
-    jiosaavn_start_page = ((page - 1) * per_page) // JIOSAAVN_INTERNAL_PAGE_SIZE + 1
-
-    # Determine how many internal JioSaavn API calls are needed
-    # to cover the 'per_page' songs for the current 'page'
-    num_internal_calls = (per_page + JIOSAAVN_INTERNAL_PAGE_SIZE - 1) // JIOSAAVN_INTERNAL_PAGE_SIZE
-
-    print(f"Searching JioSaavn for: '{query}' (requested page={page}, per_page={per_page})")
-    print(f"Internal JioSaavn calls: starting from page {jiosaavn_start_page}, {num_internal_calls} calls needed.")
-
-    for i in range(num_internal_calls):
-        current_jiosaavn_page = jiosaavn_start_page + i
-        try:
-            params = {
-                'query': query,
-                'page': current_jiosaavn_page
-            }
-            url = f"{JIOSAAVN_API_BASE}/search/songs"
-            response = requests.get(url, params=params, timeout=10)
-            print(f"JioSaavn API status for internal page {current_jiosaavn_page}: {response.status_code}")
-
-            if response.status_code == 200:
-                data = response.json()
-                results = data.get('data', {}).get('results', [])
-
-                if not results:
-                    print(f"No more results from JioSaavn for internal page {current_jiosaavn_page}.")
-                    break # No more results, stop fetching
-
-                # Add all results from this internal page
-                all_songs_from_jiosaavn.extend(results)
-            else:
-                print(f"JioSaavn API error for internal page {current_jiosaavn_page}: {response.status_code} - {response.text[:200]}")
-                break # Stop on error
-        except Exception as e:
-            print(f"Error searching JioSaavn for internal page {current_jiosaavn_page}: {e}")
-            import traceback
-            traceback.print_exc()
-            break # Stop on error
-
-    processed_songs = []
-    for item in all_songs_from_jiosaavn:
-        # ... (existing song processing logic) ...
-        title = item.get('name') or item.get('title') or 'Unknown Title'
-        artist = None
-        if item.get('artists') and isinstance(item['artists'], dict) and 'primary' in item['artists']:
-            primary_artists = item['artists']['primary']
-            if isinstance(primary_artists, list) and primary_artists:
-                artist_names = [a['name'] for a in primary_artists if isinstance(a, dict) and a.get('name')]
-                if artist_names:
-                    artist = ', '.join(artist_names)
-        if not artist and item.get('primaryArtists'):
-            if isinstance(item['primaryArtists'], str):
-                artist = item['primaryArtists']
-        if not artist and item.get('artists'):
-            if isinstance(item['artists'], str):
-                artist = item['artists']
-        if not artist:
-            artist = item.get('artist')
-        if not artist and item.get('artistMap') and item['artistMap'].get('primary_artists'):
-            pa = item['artistMap']['primary_artists']
-            if isinstance(pa, list) and pa and isinstance(pa[0], dict):
-                artist = pa[0].get('name')
-        if isinstance(artist, str):
-            artist = artist.strip()
-            if not artist or artist.lower() in ['unknown', 'unknown artist', '']:
-                artist = 'Unknown Artist'
-
-        album = None
-        if item.get('album'):
-            if isinstance(item['album'], dict):
-                album = item['album'].get('name') or item['album'].get('title')
-            elif isinstance(item['album'], str):
-                album = item['album']
-        if not album:
-            album = item.get('albumMap', {}).get('name') or item.get('albumName')
-
-        thumbnail = None
-        if item.get('image'):
-            if isinstance(item['image'], list) and item['image']:
-                thumbnail = item['image'][-1]
-                if isinstance(thumbnail, dict):
-                    thumbnail = thumbnail.get('link') or thumbnail.get('url')
-            elif isinstance(item['image'], str):
-                thumbnail = item['image']
-        if not thumbnail:
-            for img_field in ['imageUrl', 'image_url', 'artwork', 'cover']: 
-                if item.get(img_field):
-                    thumbnail = item[img_field]
-                    break
-        if thumbnail and isinstance(thumbnail, str):
-            if '150x150' in thumbnail:
-                thumbnail = thumbnail.replace('150x150', '500x500')
-            elif '50x50' in thumbnail:
-                thumbnail = thumbnail.replace('50x50', '500x500')
-            thumbnail = upgrade_url(thumbnail)
-
-        year = None
-        year_fields = ['year', 'releaseYear', 'release_year', 'albumYear']
-        for field in year_fields:
-            if item.get(field):
-                try:
-                    year_val = str(item[field])
-                    if year_val.isdigit() and len(year_val) == 4:
-                        year = int(year_val)
-                        break
-                except:
-                    continue
-
-        duration = None
-        if item.get('duration'):
-            try:
-                duration_val = item['duration']
-                if isinstance(duration_val, str):
-                    if ':' in duration_val:
-                        parts = duration_val.split(':')
-                        if len(parts) == 2:
-                            minutes, seconds = int(parts[0]), int(parts[1])
-                            duration = minutes * 60 + seconds
-                        else:
-                            duration = int(duration_val)
-                    else:
-                        duration = int(duration_val)
-            except:
-                pass
-
-        audio_url = None
-        if 'downloadUrl' in item and item['downloadUrl']:
-            download_urls = item['downloadUrl']
-            if isinstance(download_urls, list):
-                for quality in ['320kbps', '160kbps', '96kbps', '48kbps']:
-                    for d in download_urls:
-                        if isinstance(d, dict) and d.get('quality') == quality and d.get('url'):
-                            audio_url = d['url']
-                            break
-                    if audio_url:
-                        break
-                if not audio_url:
-                    for d in download_urls:
-                        if isinstance(d, dict) and d.get('url'):
-                            audio_url = d['url']
-                            break
-                if not audio_url:
-                    url_fields = ['permaUrl', 'url', 'playUrl', 'streamUrl']
-                    for field in url_fields:
-                        if item.get(field):
-                            audio_url = item[field]
-                            break
-                if audio_url:
-                    audio_url = upgrade_url(audio_url)
-
-        if audio_url and title:
-            song_data = {
-                'id': item.get('id') or f"jiosaavn-{len(processed_songs)}",
-                'title': title,
-                'artist': artist,
-                'album': album,
-                'year': year,
-                'duration': duration,
-                'url': audio_url,
-                'source': 'jiosaavn',
-                'thumbnail': thumbnail
-            }
-            processed_songs.append(song_data)
-
-    # Return only the number of songs requested by per_page
-    # The total_found will be the actual number of songs fetched, not a global total from JioSaavn
-    return processed_songs[:per_page], len(processed_songs)
+    print(f"Searching JioSaavn for: '{query}' (page={page}, per_page={per_page})")
+    try:
+        songs, total_results = jiosaavn.search_songs(query, page=page, limit=per_page)
+        print(f"Found {len(songs)} songs from jiosaavn module.")
+        return songs, total_results
+    except Exception as e:
+        print(f"Error searching via jiosaavn module: {e}")
+        import traceback
+        traceback.print_exc()
+        return [], 0
     
 
 
@@ -689,60 +513,60 @@ def api_artist_songs(artist_name):
 
 
 #http://127.0.0.1:5600/api/artist?name=arijit%20singh
-@app.route('/api/artist', methods=['GET'])
-def search_artist():
-    try:
-        # Get artist name from query params
-        artist_name = request.args.get("name")
-        if not artist_name:
-            return jsonify({
-                "error": "Please provide an artist name",
-                "artist": None
-            }), 400
-
-        # Call JioSaavn unofficial API
-        url = f"https://saavn.dev/api/search/artists?query={artist_name}&page=0&limit=10"
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-
-        if not data.get("success") or not data["data"]["results"]:
-            return jsonify({
-                "error": f"No artist found for '{artist_name}'",
-                "artist": None
-            }), 404
-
-        # Take the first best match
-        artist = data["data"]["results"][0]
-
-        # pick best image
-        image_url = None
-        if "image" in artist and artist["image"]:
-            image_url = artist["image"][-1]["url"]
-
-        artist_details = {
-            "id": artist.get("id"),
-            "name": artist.get("name"),
-            "role": artist.get("role"),
-            "image": image_url
-        }
-
-        return jsonify({
-            "artist": artist_details
-        })
-
-    except requests.RequestException as e:
-        print(f"Network error fetching artist details: {e}")
-        return jsonify({
-            "error": "Failed to fetch artist details",
-            "artist": None
-        }), 500
-    except Exception as e:
-        print(f"Error in search_artist: {e}")
-        return jsonify({
-            "error": "Unexpected error",
-            "artist": None
-        }), 500
+# @app.route('/api/artist', methods=['GET'])
+# def search_artist():
+#     try:
+#         # Get artist name from query params
+#         artist_name = request.args.get("name")
+#         if not artist_name:
+#             return jsonify({
+#                 "error": "Please provide an artist name",
+#                 "artist": None
+#             }), 400
+#
+#         # Call JioSaavn unofficial API
+#         url = f"https://saavn.dev/api/search/artists?query={artist_name}&page=0&limit=10"
+#         response = requests.get(url, timeout=10)
+#         response.raise_for_status()
+#         data = response.json()
+#
+#         if not data.get("success") or not data["data"]["results"]:
+#             return jsonify({
+#                 "error": f"No artist found for '{artist_name}'",
+#                 "artist": None
+#             }), 404
+#
+#         # Take the first best match
+#         artist = data["data"]["results"][0]
+#
+#         # pick best image
+#         image_url = None
+#         if "image" in artist and artist["image"]:
+#             image_url = artist["image"][-1]["url"]
+#
+#         artist_details = {
+#             "id": artist.get("id"),
+#             "name": artist.get("name"),
+#             "role": artist.get("role"),
+#             "image": image_url
+#         }
+#
+#         return jsonify({
+#             "artist": artist_details
+#         })
+#
+#     except requests.RequestException as e:
+#         print(f"Network error fetching artist details: {e}")
+#         return jsonify({
+#             "error": "Failed to fetch artist details",
+#             "artist": None
+#         }), 500
+#     except Exception as e:
+#         print(f"Error in search_artist: {e}")
+#         return jsonify({
+#             "error": "Unexpected error",
+#             "artist": None
+#         }), 500
 
 # http://127.0.0.1:5600/api/popular-artists?page=1&limit=15
 @app.route('/api/popular-artists', methods=['GET'])
