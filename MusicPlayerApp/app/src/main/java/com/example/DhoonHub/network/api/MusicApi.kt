@@ -42,7 +42,7 @@ data class PopularArtistsResponse(val artists: List<String>)
 
 data class ArtistDetailsResponse(val artist: TrendingArtist)
 
-data class ArtistSongsResponse(val songs: List<Song>)
+data class ArtistSongsResponse(val songs: List<Song>?)
 
 interface MusicApi {
     @GET("api/search")

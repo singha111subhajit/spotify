@@ -267,7 +267,7 @@ class MusicRepository(private val context: Context) {
     suspend fun getArtistSongs(artistName: String, page: Int, perPage: Int): List<Song> {
         return withContext(Dispatchers.IO) {
             try {
-                musicApi.getArtistSongs(artistName, page, perPage).songs
+                musicApi.getArtistSongs(artistName, page, perPage).songs ?: emptyList()
             } catch (e: Exception) {
                 emptyList()
             }

@@ -15,3 +15,4 @@ object ValidationUtils {
         return if (password.length >= 6) ValidationResult.Success
         else ValidationResult.Error("Password must be at least 6 characters long")
     }
+}
