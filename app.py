@@ -463,53 +463,111 @@ def api_search():
         traceback.print_exc()
         return jsonify({'error': 'Search failed'}), 500
 
+
+@app.route('/api/artist', methods=['GET'])
+def api_artist_songs_by_query():
+    """Support /api/artist_songs?name=Arijit Singh for Android app."""
+    artist_name = request.args.get("name")
+    if not artist_name:
+        return jsonify({'error': 'Artist name parameter required'}), 400
+
+    # Redirect internally to the main handler
+    return api_artist_songs(artist_name)
+
+
 @app.route('/api/artist_songs/<artist_name>')
 def api_artist_songs(artist_name):
-    """Get songs for a given artist from JioSaavn with pagination."""
     try:
         if not artist_name:
             return jsonify({'error': 'Artist name parameter required'}), 400
 
-        # Get page and per_page from query params (default: page=1, per_page=30)
         page = int(request.args.get("page", 1))
         per_page = int(request.args.get("per_page", 30))
 
-        # Fetch songs
-        jiosaavn_songs, total_found = search_jiosaavn(artist_name, page=page, per_page=per_page)
+        # -------------------------------------------------
+        # Fetch JioSaavn songs for the artist
+        # -------------------------------------------------
+        jiosaavn_songs, total_found = search_jiosaavn(
+            artist_name, page=page, per_page=per_page
+        )
 
-        # Filter songs for the specific artist
+        # Filter by artist match
         artist_songs = [
             song for song in jiosaavn_songs
             if artist_name.lower() in song.get('artist', '').lower()
         ]
 
-        # Secure song URLs
+        # Secure URLs (convert http → https)
         def secure_song(song):
             if song.get('source') == 'jiosaavn':
-                song = song.copy()
-                song['url'] = upgrade_url(song.get('url'))
-                if song.get('thumbnail'):
-                    song['thumbnail'] = upgrade_url(song.get('thumbnail'))
+                s = song.copy()
+                s['url'] = upgrade_url(s['url'])
+                if s.get('thumbnail'):
+                    s['thumbnail'] = upgrade_url(s['thumbnail'])
+                return s
             return song
 
-        all_results = [secure_song(song) for song in artist_songs]
+        songs = [secure_song(song) for song in artist_songs]
 
-        response_data = {
-            'songs': all_results,
-            'page': page,
-            'per_page': per_page,
-            'returned': len(all_results),
-            'total_found': total_found,   # total from JioSaavn search
-            'query': artist_name,
+        # -------------------------------------------------
+        # Extract REAL artist metadata from the songs
+        # -------------------------------------------------
+        artist_meta = {
+            "id": None,
+            "name": artist_name,
+            "role": "artist",
+            "image": None
         }
 
-        return jsonify(response_data)
+        # Extract thumbnail & id
+        for song in songs:
+            artists_str = song.get("artist", "")
+            artists_list = [a.strip().lower() for a in artists_str.split(",")]
+
+            if artist_name.lower() in artists_list:
+                # Pick ID from the first matching song
+                artist_meta["id"] = song.get("id")
+
+                # Make a small 150x150 image
+                thumb = song.get("thumbnail")
+                if thumb:
+                    artist_meta["image"] = thumb.replace("500x500", "150x150")
+
+                break  # stop after first match
+
+        # -------------------------------------------------
+        # Fallbacks if image or ID missing
+        # -------------------------------------------------
+        if artist_meta["id"] is None:
+            artist_meta["id"] = "unknown"
+
+        if not artist_meta["image"]:
+            artist_meta["image"] = ""
+
+        # -------------------------------------------------
+        # Final response
+        # -------------------------------------------------
+        return jsonify({
+            "artist": artist_meta,
+            "songs": songs
+        })
 
     except Exception as e:
-        print(f"Error in api_artist_songs: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': 'Failed to fetch artist songs'}), 500
+        print("Error in api_artist_songs:", e)
+        return jsonify({
+            "artist": {
+                "id": "unknown",
+                "name": artist_name,
+                "role": "artist",
+                "image": ""
+            },
+            "songs": []
+        }), 500
+
+
+
+
+
 
 
 #http://127.0.0.1:5600/api/artist?name=arijit%20singh
